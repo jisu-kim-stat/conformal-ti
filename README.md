@@ -51,3 +51,9 @@ pointwise CSV with columns:
 For reproducibility, seed are managed inside the replication loop.
 - Results (`results/`, `*.csv`, `*.png`) are excluded.
 
+## References
+
+- **Guo, Y. and Young, D. S. (2024).**  
+  *Approximate tolerance intervals for nonparametric regression models.*  
+  Journal of Nonparametric Statistics, **36**(1), 212–239.  
+  DOI: https://doi.org/10.1080/10485252.2023.2277260
