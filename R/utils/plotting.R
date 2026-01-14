@@ -1,4 +1,4 @@
-# R/70_plots.R
+
 plot_marginal <- function(coverage_df, out_path = NULL) {
   coverage_summary <- coverage_df %>%
     group_by(model, m) %>%
