@@ -35,4 +35,3 @@ find_k_factor <- function(nu, norm_lx_h, content, alpha) {
 
   sqrt((nu * q1) / q2)
 }
-

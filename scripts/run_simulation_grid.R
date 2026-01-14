@@ -37,7 +37,7 @@ suppressPackageStartupMessages({
 # ---------------------------
 # Simulation setup
 # ---------------------------
-sample_sizes <- c(250, 500, 1000)
+sample_sizes <- c(300, 500, 1000)
 models <- 1:6
 
 c <- 0.90          # content level
