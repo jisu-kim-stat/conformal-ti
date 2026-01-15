@@ -65,6 +65,7 @@ def load_tsa(path_or_url: str) -> pd.DataFrame:
     return df
 
 
+
 # ----------------------------
 # transforms (choose one)
 # ----------------------------
@@ -128,6 +129,108 @@ def make_time_features(dates: pd.Series, d0: pd.Timestamp) -> np.ndarray:
 
     X = np.column_stack([t, dow, month, sin7, cos7, sin365, cos365])
     return X
+
+# =========================
+# ---DEBUG : Scale이 의미가 있는지 확인
+# =========================
+def q(x, qs=(0, 0.01, 0.5, 0.99, 1.0)):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if x.size == 0:
+        return None
+    return np.quantile(x, qs)
+
+def debug_scale_invariance(
+    df: pd.DataFrame,
+    seed: int = 1,
+    split_mode: str = "random",
+    target_sizes=(365, 365, 360),
+    alpha: float = 0.10,
+    delta: float = 0.05,
+    tf_mode: str = "asinh",
+    scale_list=(1e5, 1e6, 1e7),
+    a_end="2020-12-31",
+    b_start="2021-01-01",
+    train_frac_A=0.5,
+):
+    # --- fixed split (important) ---
+    if split_mode == "random":
+        df_tr, df_cal, df_te = split_random(df, seed=seed, target_sizes=target_sizes)
+    else:
+        df_tr, df_cal, df_te = split_time(df, a_end=a_end, b_start=b_start,
+                                          train_frac_A=train_frac_A, seed=seed)
+
+    print(f"\n[Split] mode={split_mode} seed={seed} |train|={len(df_tr)} |cal|={len(df_cal)} |test|={len(df_te)}")
+
+    # --- run Ours only (hetero) with diagnostics ---
+    for c in scale_list:
+        tf_fn, itf_fn = make_transform(tf_mode=tf_mode, scale_c=float(c))
+
+        # ===== replicate core of run_ours_1d but expose internals =====
+        d0 = df_tr["date"].min()
+        X_tr  = make_time_features(df_tr["date"], d0)
+        X_cal = make_time_features(df_cal["date"], d0)
+        X_te  = make_time_features(df_te["date"], d0)
+
+        y_tr  = df_tr["throughput"].to_numpy()
+        y_cal = df_cal["throughput"].to_numpy()
+        y_te  = df_te["throughput"].to_numpy()
+
+        z_tr  = tf_fn(y_tr)
+        z_cal = tf_fn(y_cal)
+
+        mean_pipe = Pipeline([
+            ("imp", SimpleImputer(strategy="median")),
+            ("sc", StandardScaler()),
+            ("m", GradientBoostingRegressor(random_state=seed)),
+        ])
+        var_pipe = Pipeline([
+            ("imp", SimpleImputer(strategy="median")),
+            ("sc", StandardScaler()),
+            ("m", GradientBoostingRegressor(random_state=seed + 1)),
+        ])
+
+        mean_pipe.fit(X_tr, z_tr)
+        mu_tr = mean_pipe.predict(X_tr)
+
+        res2_tr = (z_tr - mu_tr) ** 2
+        finite = np.isfinite(res2_tr)
+        # 상대 eps : train residual scale에 비례
+        eps = 1e-3 * np.median(res2_tr[finite]) if np.any(finite) else 1e-6
+        eps = max(eps, 1e-10)
+
+        logv_tr = np.log(res2_tr + eps)
+        var_pipe.fit(X_tr, logv_tr)
+
+        mu_cal = mean_pipe.predict(X_cal)
+        logv_cal = var_pipe.predict(X_cal)
+        var_cal = np.maximum(np.exp(logv_cal), eps)
+
+        lam = find_lambda_fast(alpha, delta, z_cal, mu_cal, var_cal)
+
+        mu_te = mean_pipe.predict(X_te)
+        logv_te = var_pipe.predict(X_te)
+        var_te = np.maximum(np.exp(logv_te), eps)
+
+        z_margin = lam * np.sqrt(var_te)
+        z_lo = mu_te - z_margin
+        z_hi = mu_te + z_margin
+
+        lower = np.maximum(itf_fn(z_lo), 0.0)
+        upper = itf_fn(z_hi)
+
+        content = float(np.mean((y_te >= lower) & (y_te <= upper)))
+        mean_width = float(np.mean(upper - lower))
+
+        # ===== print diagnostics =====
+        print(f"\n[c={c:.1e}] tf={tf_mode}")
+        print("  lam:", lam)
+        print("  z_tr  q:", q(z_tr))
+        print("  var_cal q:", q(var_cal))
+        print("  var_te  q:", q(var_te))
+        print("  z_margin q:", q(z_margin))
+        print("  width q:", q(upper - lower))
+        print("  content:", content, " mean_width:", mean_width)
 
 # =========================
 # P-spline utilities (GY)
@@ -895,7 +998,7 @@ def main():
                     help="Scaling constant for transformation.")
 
     # split mode
-    ap.add_argument("--split_mode", type=str, default="time",
+    ap.add_argument("--split_mode", type=str, default="random",
                     choices=["time", "random"],
                     help="time: A->train/cal, B->test; random: i.i.d. random split")
 
@@ -959,4 +1062,12 @@ def main():
 
 
 if __name__ == "__main__":
+    df = load_tsa(DEFAULT_TSA_URL)
+    debug_scale_invariance(
+        df,
+        seed=1,
+        split_mode="random",
+        tf_mode="asinh",
+        scale_list=(1e5, 1e6, 1e7),
+    )
     main()
