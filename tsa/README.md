@@ -46,6 +46,8 @@ python3 tsa/run_tsa_3way.py \
   --out_csv results_tsa_3way.csv
 ```
 
+
+
 ### Outputs
 The script produces:
 - Summary results `results_tsa_3way.csv`
@@ -56,3 +58,12 @@ To visualize prediction intervals for a fixed seed:
 ```bash
 python3 tsa/plot.py --csv results_tsa_3way_intervals.csv --seed 1
 ```
+
+To visualize pointwise coverage for every seed : 
+```bash
+python3 tsa/plot_pointwise_coverage.py \
+--intervals results_tsa_3way_intervals.csv \
+--out plots/tsa_pointwise_coverage_5methods.png \
+--target 0.90   --window 7
+```
+- `window` : rolling window.시각화를 위해 해당 일을 포함안 7일 단위로 local smoothing 
