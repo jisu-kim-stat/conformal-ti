@@ -311,7 +311,7 @@ class TSASplit:
     df_train: pd.DataFrame
     df_cal: pd.DataFrame
     df_test: pd.DataFrame
-    split_mode : str
+    split_mode: str
 
 def make_time_split(df: pd.DataFrame,
                     a_end: str = "2020-12-31",
@@ -1062,12 +1062,4 @@ def main():
 
 
 if __name__ == "__main__":
-    df = load_tsa(DEFAULT_TSA_URL)
-    debug_scale_invariance(
-        df,
-        seed=1,
-        split_mode="random",
-        tf_mode="asinh",
-        scale_list=(1e5, 1e6, 1e7),
-    )
     main()
