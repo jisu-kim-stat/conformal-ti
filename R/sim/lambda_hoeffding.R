@@ -33,12 +33,12 @@ find_lambda_hat <- function(mis, alpha, y, pred, variance, n) {
   # Hoeffding correction
   lambda_hoef <- sqrt(log(1 / alpha) / (2 * n))
 
-  target <- 1 - mis + lambda_hoef
-  if (target > 1) return(NA_real_)
+  target_raw <- 1 - mis + lambda_hoef
+  target <- if (target_raw > 1) (1) else target_raw
 
   # smallest k such that F_hat(k) >= target
-  idx <- which(cumsum(rep(1 / n, n)) >= target)[1]
-  if (is.na(idx)) return(NA_real_)
+  idx <- ceiling(n*target)
+  idx <- max(1, min(idx,n))
 
   z_sorted[idx]
 }

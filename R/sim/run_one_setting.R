@@ -22,7 +22,7 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
         stopifnot(is.numeric(content_level), length(content_level) == 1)
         stopifnot(is.numeric(alpha_conf), length(alpha_conf) == 1)
 
-        if (method == "Ours") {
+        if (method == "HCTI") {
           r <- one_replication_ours(
             model_id = model_id,
             n        = n,
@@ -30,7 +30,7 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
             alpha    = alpha_conf,
             seed     = b
           )
-        } else if (method == "GY") {
+        } else if (method == "Parametric TI") {
           r <- one_replication_gy(
             model_id = model_id,
             n        = n,
@@ -84,12 +84,12 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
     out
   }
 
-  long_ours <- run_method_long("Ours")
-  long_gy   <- run_method_long("GY")
+  long_ours <- run_method_long("HCTI")
+  long_gy   <- run_method_long("Parametric TI")
 
   dplyr::bind_rows(
-    summarize_pointwise(long_ours, "Ours"),
-    summarize_pointwise(long_gy, "GY")
+    summarize_pointwise(long_ours, "HCTI"),
+    summarize_pointwise(long_gy, "Parametric TI")
   ) %>%
     dplyr::select(x, coverage, mean_width, na_proportion, model, n, Method)
 }
