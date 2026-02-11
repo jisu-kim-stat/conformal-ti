@@ -42,7 +42,10 @@ def tf(y: np.ndarray) -> np.ndarray:
     return np.log1p(y)
 
 def itf(z: np.ndarray) -> np.ndarray:
+    z = np.asarray(z)
+    z = np.clip(z, -50, 50)   # exp(50) ~ 3e21 정도, 충분히 큰데 overflow는 막음
     return np.expm1(z)
+
 
 
 # ----------------------------
@@ -190,7 +193,9 @@ def run_ours(dfA: pd.DataFrame, dfB: pd.DataFrame,
     upper = itf(mu_test + lam * np.sqrt(var_test))
 
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
-    mean_width = float(np.mean(upper - lower))
+    w = upper - lower
+    w = w[np.isfinite(w)]
+    mean_width = float(np.mean(w))
 
     return dict(method="HCTI(multivar)", lambda_=lam, content=content, mean_width=mean_width)
 
@@ -297,41 +302,7 @@ def run_gy_1d(dfA: pd.DataFrame, dfB: pd.DataFrame,
     content = float(np.mean((y_test >= lower_test) & (y_test <= upper_test)))
     mean_width = float(np.mean(upper_test - lower_test))
 
-    return dict(method="GY(1D mag_r)", lambda_=np.nan, content=content, mean_width=mean_width)
-
-def main():
-    root = Path(__file__).resolve().parents[1]
-    dfA = load_happy(root / "data" / "Happy" / "happy_A")
-    dfB = load_happy(root / "data" / "Happy" / "happy_B")
-
-    alpha = 0.10
-    delta = 0.05
-    n_sample = 5000
-    seed = 123
-
-    # ---- Ours: multivariate features ----
-    feature_cols = ["mag_r", "u_g", "g_r", "r_i", "i_z", "feat1", "feat2", "feat3", "feat4", "feat5"]
-    y_col = "z_spec"
-
-    res_ours = run_ours(dfA, dfB, feature_cols, y_col, alpha, delta, n_sample, seed)
-    res_ours['method'] = "HCTI(multivar)"
-
-    # ---- Ours: 1D baseline using mag_r ----
-    res_ours_1d = run_ours(
-        dfA, dfB,
-        feature_cols=["mag_r"],
-        y_col=y_col,
-        alpha=alpha, delta=delta,
-        n_sample=n_sample, seed=seed
-    )
-    res_ours_1d['method'] = "HCTI(1D mag_r)"
-
-    # ---- GY: 1D baseline using mag_r ----
-    res_gy = run_gy_1d(dfA, dfB, x_col="mag_r", y_col=y_col, alpha=alpha, delta=delta, n_sample=n_sample, seed=seed)
-    res_gy['method'] = "Parametric TI(1D mag_r)"
-
-    out = pd.DataFrame([res_ours, res_ours_1d, res_gy])
-    print(out.to_string(index=False))
+    return dict(method="Parametric TI", lambda_=np.nan, content=content, mean_width=mean_width)
 
 
 def run_many_seeds(dfA, dfB, seeds=range(1, 51), n_sample=5000, alpha=0.10, delta=0.05):
@@ -345,7 +316,7 @@ def run_many_seeds(dfA, dfB, seeds=range(1, 51), n_sample=5000, alpha=0.10, delt
             alpha=alpha, delta=delta,
             n_sample=n_sample, seed=seed
         )
-        r1["method"] = "HCTI(1D mag_r)"
+        r1["method"] = "HCTI"
         r1["seed"] = seed
 
         # GY(1D)
@@ -355,7 +326,7 @@ def run_many_seeds(dfA, dfB, seeds=range(1, 51), n_sample=5000, alpha=0.10, delt
             alpha=alpha, delta=delta,
             n_sample=n_sample, seed=seed
         )
-        r2["method"] = "Parametric TI(1D mag_r)"
+        r2["method"] = "Parametric TI"
         r2["seed"] = seed
 
         rows.extend([r1, r2])
@@ -369,12 +340,38 @@ def main():
 
     df_res = run_many_seeds(dfA, dfB)
 
-    print(
-        df_res
+    # after df_res computed
+    W_MAX = 10.0 # or set based on y_test scale; keep fixed for paper reproducibility
+
+    df_res["is_invalid"] = (
+        ~np.isfinite(df_res["mean_width"].to_numpy())
+        | ~np.isfinite(df_res["content"].to_numpy())
+    )
+
+    df_res["is_exploded"] = (df_res["mean_width"] > W_MAX)
+
+    df_res["is_failure"] = df_res["is_invalid"] | df_res["is_exploded"]
+
+    df_ok = df_res[~df_res["is_failure"]].copy()
+
+    summary = (
+        df_ok
         .groupby("method")[["content", "mean_width"]]
         .agg(["mean", "std", "median"])
         .round(4)
     )
+    print(summary)
+
+    fail_tbl = (
+        df_res
+        .groupby("method")["is_failure"]
+        .agg(["sum", "count"])
+        .rename(columns={"sum": "n_fail", "count": "n_total"})
+    )
+    fail_tbl["fail_rate"] = (fail_tbl["n_fail"] / fail_tbl["n_total"]).round(3)
+    print("\n[failure-rate]")
+    print(fail_tbl)
+
 
     df_res.to_csv("results_happy_1d.csv", index=False)
 

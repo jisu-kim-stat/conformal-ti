@@ -333,6 +333,153 @@ def gy_predict_intervals(gy: dict, x_new: np.ndarray, df_mean: int = 12) -> tupl
 # ----------------------------
 # Plotting
 # ----------------------------
+
+# ----------------------------
+# Paper plotting helpers
+# ----------------------------
+def paper_rcparams():
+    plt.rcParams.update({
+        "font.size": 11,
+        "axes.titlesize": 11,
+        "axes.labelsize": 11,
+        "legend.fontsize": 10,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
+        "axes.linewidth": 0.8,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.02,
+        "pdf.fonttype": 42,   # editable text in Illustrator
+        "ps.fonttype": 42,
+    })
+
+def save_fig(fig, out_base: Path, dpi: int = 300):
+    fig.savefig(out_base.with_suffix(".pdf"))
+    fig.savefig(out_base.with_suffix(".png"), dpi=dpi)
+    plt.close(fig)
+
+def rolling_mean(x: np.ndarray, y: np.ndarray, window: int = 101) -> np.ndarray:
+    """Simple rolling mean assuming x is sorted; window should be odd."""
+    window = max(5, int(window))
+    if window % 2 == 0:
+        window += 1
+    # pad edges
+    y_pad = np.pad(y, (window//2, window//2), mode="edge")
+    kernel = np.ones(window) / window
+    return np.convolve(y_pad, kernel, mode="valid")
+
+
+# ----------------------------
+# Paper figures
+# ----------------------------
+def make_paper_figures(
+    x_test_s: np.ndarray,
+    y_test_s: np.ndarray,
+    ours_lo: np.ndarray, ours_up: np.ndarray,
+    gy_lo: np.ndarray, gy_up: np.ndarray,
+    ours_content: float, gy_content: float,
+    ours_width: float, gy_width: float,
+    out_dir: Path,
+    seed: int,
+):
+    paper_rcparams()
+    out_dir.mkdir(exist_ok=True)
+
+    # Colors (colorblind-friendly-ish)
+    c_ours = "#1f77b4"   # blue
+    c_gy   = "#d62728"   # red/brick
+
+    # ============
+    # Fig A: Overlay ribbons on test set (main)
+    # ============
+    fig = plt.figure(figsize=(6.8, 3.6))
+    ax = fig.add_subplot(1, 1, 1)
+
+    # scatter (thin)
+    ax.scatter(x_test_s, y_test_s,color='black', s=5, alpha=0.15, linewidths=0, zorder=1)
+
+    # ribbons
+    ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.18, color=c_gy, label=None, zorder=2)
+    ax.fill_between(x_test_s, ours_lo, ours_up, alpha=0.18, color=c_ours, label=None, zorder=2)
+
+    # median lines (optional but nice in papers)
+    ax.plot(x_test_s, 0.5*(gy_lo+gy_up), color=c_gy, linewidth=1.2, zorder=3)
+    ax.plot(x_test_s, 0.5*(ours_lo+ours_up), color=c_ours, linewidth=1.2, zorder=3)
+
+    # axes labels only (title removed; explain in caption)
+    ax.set_xlabel(r"$\mathrm{mag}_r$")
+    ax.set_ylabel(r"$z_{\mathrm{spec}}$")
+
+    # minimalist legend: method + (content, width)
+    # (Keep numbers out if you prefer caption-only; I’ll keep it compact)
+    lab_gy   = "Parametric TI"
+    lab_ours = "HCTI"
+
+    from matplotlib.patches import Patch
+    handles = [
+        Patch(facecolor=c_gy,   edgecolor="none", alpha=0.18, label=lab_gy),
+        Patch(facecolor=c_ours, edgecolor="none", alpha=0.18, label=lab_ours),
+    ]
+    ax.legend(handles=handles, loc="upper right", frameon=False)
+
+    # clean spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    fig.tight_layout()
+    save_fig(fig, out_dir / f"happyB_overlay_seed{seed}")
+
+    # ============
+    # Fig B: Local width vs x (smoothed), on test grid (main or appendix)
+    # ============
+    w_ours = ours_up - ours_lo
+    w_gy   = gy_up - gy_lo
+
+    # smooth for readability (x already sorted)
+    w_ours_sm = rolling_mean(x_test_s, w_ours, window=151)
+    w_gy_sm   = rolling_mean(x_test_s, w_gy, window=151)
+
+    fig = plt.figure(figsize=(6.8, 3.2))
+    ax = fig.add_subplot(1, 1, 1)
+
+    ax.plot(x_test_s, w_gy_sm, color=c_gy, linewidth=1.6, linestyle="-", label="Parametric TI")
+    ax.plot(x_test_s, w_ours_sm, color=c_ours, linewidth=1.6, linestyle="-", label="HCTI")
+
+    ax.set_xlabel(r"$\mathrm{mag}_r$")
+    ax.set_ylabel("Interval width")
+
+    ax.legend(loc="upper right", frameon=False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    fig.tight_layout()
+    save_fig(fig, out_dir / f"happyB_width_curve_seed{seed}")
+
+    # ============
+    # Fig C (optional): coverage indicator vs x (smoothed empirical)
+    # ============
+    hit_ours = ((y_test_s >= ours_lo) & (y_test_s <= ours_up)).astype(float)
+    hit_gy   = ((y_test_s >= gy_lo) & (y_test_s <= gy_up)).astype(float)
+    hit_ours_sm = rolling_mean(x_test_s, hit_ours, window=301)
+    hit_gy_sm   = rolling_mean(x_test_s, hit_gy, window=301)
+
+    fig = plt.figure(figsize=(6.8, 3.2))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(x_test_s, hit_gy_sm, color=c_gy, linewidth=1.6, linestyle="-", label="Parametric TI")
+    ax.plot(x_test_s, hit_ours_sm, color=c_ours, linewidth=1.6, linestyle="-", label="HCTI")
+    ax.axhline(0.90, color="gray", linewidth=0.9, linestyle="--", alpha=0.7)
+
+    ax.set_xlabel(r"$\mathrm{mag}_r$")
+    ax.set_ylabel("Empirical content (local)")
+    ax.set_ylim(0.0, 1.0)
+
+    ax.legend(loc="upper right", frameon=False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    fig.tight_layout()
+    save_fig(fig, out_dir / f"happyB_local_content_seed{seed}")
+
+
 def main():
     # Settings
     seed = 123
@@ -383,81 +530,34 @@ def main():
     print(f"[seed={seed}] HCTI lambda_hat={ours['lambda_hat']:.6f}  content={ours_content:.6f}  mean_width={ours_width:.6f}")
     print(f"[seed={seed}] Parametric TI   lam_gcv={gy['lam_gcv']:.6e} df_eff={gy['df_eff']:.2f}  content={gy_content:.6f}  mean_width={gy_width:.6f}")
 
-    # grid for smooth mean/var displays
-    x_min, x_max = np.percentile(x_all, [1, 99])
-    x_grid = np.linspace(x_min, x_max, 400)
-
-    # ----------------------------
-    # (A) Parametric TI diagnostics 2x2
-    # ----------------------------
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-
-    # 1) standardized y vs fitted
-    ax = axes[0, 0]
-    ax.scatter(gy["x"], gy["y_std"], s=8, alpha=0.25)
-    # approximate fitted on grid
-    y_std_grid = predict_penalized_spline(gy["x"], gy["fit_std"], x_grid, df=df_gy)
-    ax.plot(x_grid, y_std_grid, linewidth=2)
-    ax.set_title("Parametric TI: fit on standardized response (z/sqrt(varhat))")
-    ax.set_xlabel("mag_r")
-    ax.set_ylabel("standardized z")
-
-    # 2) varhat on z-scale
-    ax = axes[0, 1]
-    ax.scatter(gy["x"], (gy["z"] - gy["mean_pipe_z"].predict(gy["x"].reshape(-1,1)))**2, s=8, alpha=0.20)
-    var_grid = np.maximum(gy["var_pipe"].predict(x_grid.reshape(-1,1)), 1e-6)
-    ax.plot(x_grid, var_grid, linewidth=2)
-    ax.set_title("Parametric TI: variance model on residual^2 (z-scale)")
-    ax.set_xlabel("mag_r")
-    ax.set_ylabel("varhat")
-
-    # 3) distribution of k(x)
-    ax = axes[1, 0]
-    ax.hist(gy["k"], bins=40, alpha=0.9)
-    ax.set_title("Parametric TI: distribution of k(x) over training points")
-    ax.set_xlabel("k")
-    ax.set_ylabel("count")
-
-    # 4) test ribbon (Parametric TI)
-    ax = axes[1, 1]
-    ax.scatter(x_test_s, y_test_s, s=6, alpha=0.18)
-    ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.30)
-    ax.set_title(f"Parametric TI on Happy B (content={gy_content:.3f}, mean width={gy_width:.3f})")
-    ax.set_xlabel("mag_r")
-    ax.set_ylabel("z_spec")
-
-    fig.suptitle(f"Parametric TI diagnostics (seed={seed}, n_sample={n_sample})", y=1.02)
-    fig.tight_layout()
 
     out_dir = root / "fig"
-    out_dir.mkdir(exist_ok=True)
-    gy_path = out_dir / f"Parametric TI_diagnostics_seed{seed}.pdf"
-    fig.savefig(gy_path)
-    plt.close(fig)
-    print(f"Saved: {gy_path}")
+    make_paper_figures(
+        x_test_s=x_test_s,
+        y_test_s=y_test_s,
+        ours_lo=ours_lo, ours_up=ours_up,
+        gy_lo=gy_lo, gy_up=gy_up,
+        ours_content=ours_content, gy_content=gy_content,
+        ours_width=ours_width, gy_width=gy_width,
+        out_dir=out_dir,
+        seed=seed,
+    )
+    print(f"Saved paper figures into: {out_dir}")
 
-    # ----------------------------
-    # (B) Overlay: Ours vs Parametric TI ribbon on test
-    # ----------------------------
-    fig = plt.figure(figsize=(12, 5))
-    ax = fig.add_subplot(1, 1, 1)
+    summary_df = pd.DataFrame({
+        "seed": [seed, seed],
+        "method": ["HCTI", "Parametric TI"],
+        "content": [ours_content, gy_content],
+        "mean_width": [ours_width, gy_width],
+        "lambda_hat": [ours["lambda_hat"], np.nan],
+        "lam_gcv": [np.nan, gy["lam_gcv"]],
+        "df_eff": [np.nan, gy["df_eff"]],
+    })
 
-    ax.scatter(x_test_s, y_test_s, s=6, alpha=0.15)
 
-    # draw ribbons (order matters)
-    ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.25, label=f"Parametric TI (content={gy_content:.3f}, width={gy_width:.3f})")
-    ax.fill_between(x_test_s, ours_lo, ours_up, alpha=0.25, label=f"HCTI (content={ours_content:.3f}, width={ours_width:.3f})")
-
-    ax.set_title(f"Overlay TI on Happy B (seed={seed})")
-    ax.set_xlabel("mag_r")
-    ax.set_ylabel("z_spec")
-    ax.legend()
-
-    fig.tight_layout()
-    overlay_path = out_dir / f"overlay_ours_vs_gy_seed{seed}.pdf"
-    fig.savefig(overlay_path)
-    plt.close(fig)
-    print(f"Saved: {overlay_path}")
+    summary_path = out_dir / f"happyB_summary_seed{seed}.csv"
+    summary_df.to_csv(summary_path, index=False)
+    print(f"Saved summary table: {summary_path}")
 
 if __name__ == "__main__":
     main()

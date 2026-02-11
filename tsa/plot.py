@@ -119,8 +119,13 @@ def main():
 
     df = load_intervals(args.csv)
 
-    # Ours-PS-hetero 포함
-    methods = ["Ours", "Ours-homo", "Ours-PS-hetero", "GY-homo", "GY-hetero"]
+    methods = [
+        "HCTI-hetero",
+        "HCTI-homo",
+        "HCTI-hetero(PS)",
+        "PTI-homo",
+        "PTI-hetero",
+    ]
 
     # out을 안 주면 기본 저장 경로를 seed 기준으로 생성
     out_path = args.out
