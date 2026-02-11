@@ -8,7 +8,7 @@ import seaborn as sns
 df = pd.read_csv("results_happy_1d.csv")
 
 # method 순서 고정 (논문용)
-order = ["Ours(1D mag_r)", "GY(1D mag_r)"]
+order = ["HCTI(1D mag_r)", "Parametric TI(1D mag_r)"]
 
 # ----------------------------
 # Plot style 

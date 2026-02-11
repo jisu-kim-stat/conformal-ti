@@ -192,7 +192,7 @@ def run_ours(dfA: pd.DataFrame, dfB: pd.DataFrame,
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
     mean_width = float(np.mean(upper - lower))
 
-    return dict(method="Ours(multivar)", lambda_=lam, content=content, mean_width=mean_width)
+    return dict(method="HCTI(multivar)", lambda_=lam, content=content, mean_width=mean_width)
 
 
 
@@ -314,7 +314,7 @@ def main():
     y_col = "z_spec"
 
     res_ours = run_ours(dfA, dfB, feature_cols, y_col, alpha, delta, n_sample, seed)
-    res_ours['method'] = "Ours(multivar)"
+    res_ours['method'] = "HCTI(multivar)"
 
     # ---- Ours: 1D baseline using mag_r ----
     res_ours_1d = run_ours(
@@ -324,11 +324,11 @@ def main():
         alpha=alpha, delta=delta,
         n_sample=n_sample, seed=seed
     )
-    res_ours_1d['method'] = "Ours(1D mag_r)"
+    res_ours_1d['method'] = "HCTI(1D mag_r)"
 
     # ---- GY: 1D baseline using mag_r ----
     res_gy = run_gy_1d(dfA, dfB, x_col="mag_r", y_col=y_col, alpha=alpha, delta=delta, n_sample=n_sample, seed=seed)
-    res_gy['method'] = "GY(1D mag_r)"
+    res_gy['method'] = "Parametric TI(1D mag_r)"
 
     out = pd.DataFrame([res_ours, res_ours_1d, res_gy])
     print(out.to_string(index=False))
@@ -345,7 +345,7 @@ def run_many_seeds(dfA, dfB, seeds=range(1, 51), n_sample=5000, alpha=0.10, delt
             alpha=alpha, delta=delta,
             n_sample=n_sample, seed=seed
         )
-        r1["method"] = "Ours(1D mag_r)"
+        r1["method"] = "HCTI(1D mag_r)"
         r1["seed"] = seed
 
         # GY(1D)
@@ -355,7 +355,7 @@ def run_many_seeds(dfA, dfB, seeds=range(1, 51), n_sample=5000, alpha=0.10, delt
             alpha=alpha, delta=delta,
             n_sample=n_sample, seed=seed
         )
-        r2["method"] = "GY(1D mag_r)"
+        r2["method"] = "Parametric TI(1D mag_r)"
         r2["seed"] = seed
 
         rows.extend([r1, r2])
