@@ -380,15 +380,15 @@ def main():
     ours_width = float(np.mean(ours_up - ours_lo))
     gy_width = float(np.mean(gy_up - gy_lo))
 
-    print(f"[seed={seed}] Ours lambda_hat={ours['lambda_hat']:.6f}  content={ours_content:.6f}  mean_width={ours_width:.6f}")
-    print(f"[seed={seed}] GY   lam_gcv={gy['lam_gcv']:.6e} df_eff={gy['df_eff']:.2f}  content={gy_content:.6f}  mean_width={gy_width:.6f}")
+    print(f"[seed={seed}] HCTI lambda_hat={ours['lambda_hat']:.6f}  content={ours_content:.6f}  mean_width={ours_width:.6f}")
+    print(f"[seed={seed}] Parametric TI   lam_gcv={gy['lam_gcv']:.6e} df_eff={gy['df_eff']:.2f}  content={gy_content:.6f}  mean_width={gy_width:.6f}")
 
     # grid for smooth mean/var displays
     x_min, x_max = np.percentile(x_all, [1, 99])
     x_grid = np.linspace(x_min, x_max, 400)
 
     # ----------------------------
-    # (A) GY diagnostics 2x2
+    # (A) Parametric TI diagnostics 2x2
     # ----------------------------
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 
@@ -398,7 +398,7 @@ def main():
     # approximate fitted on grid
     y_std_grid = predict_penalized_spline(gy["x"], gy["fit_std"], x_grid, df=df_gy)
     ax.plot(x_grid, y_std_grid, linewidth=2)
-    ax.set_title("GY: fit on standardized response (z/sqrt(varhat))")
+    ax.set_title("Parametric TI: fit on standardized response (z/sqrt(varhat))")
     ax.set_xlabel("mag_r")
     ax.set_ylabel("standardized z")
 
@@ -407,37 +407,37 @@ def main():
     ax.scatter(gy["x"], (gy["z"] - gy["mean_pipe_z"].predict(gy["x"].reshape(-1,1)))**2, s=8, alpha=0.20)
     var_grid = np.maximum(gy["var_pipe"].predict(x_grid.reshape(-1,1)), 1e-6)
     ax.plot(x_grid, var_grid, linewidth=2)
-    ax.set_title("GY: variance model on residual^2 (z-scale)")
+    ax.set_title("Parametric TI: variance model on residual^2 (z-scale)")
     ax.set_xlabel("mag_r")
     ax.set_ylabel("varhat")
 
     # 3) distribution of k(x)
     ax = axes[1, 0]
     ax.hist(gy["k"], bins=40, alpha=0.9)
-    ax.set_title("GY: distribution of k(x) over training points")
+    ax.set_title("Parametric TI: distribution of k(x) over training points")
     ax.set_xlabel("k")
     ax.set_ylabel("count")
 
-    # 4) test ribbon (GY)
+    # 4) test ribbon (Parametric TI)
     ax = axes[1, 1]
     ax.scatter(x_test_s, y_test_s, s=6, alpha=0.18)
     ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.30)
-    ax.set_title(f"GY on Happy B (content={gy_content:.3f}, mean width={gy_width:.3f})")
+    ax.set_title(f"Parametric TI on Happy B (content={gy_content:.3f}, mean width={gy_width:.3f})")
     ax.set_xlabel("mag_r")
     ax.set_ylabel("z_spec")
 
-    fig.suptitle(f"GY diagnostics (seed={seed}, n_sample={n_sample})", y=1.02)
+    fig.suptitle(f"Parametric TI diagnostics (seed={seed}, n_sample={n_sample})", y=1.02)
     fig.tight_layout()
 
     out_dir = root / "fig"
     out_dir.mkdir(exist_ok=True)
-    gy_path = out_dir / f"gy_diagnostics_seed{seed}.pdf"
+    gy_path = out_dir / f"Parametric TI_diagnostics_seed{seed}.pdf"
     fig.savefig(gy_path)
     plt.close(fig)
     print(f"Saved: {gy_path}")
 
     # ----------------------------
-    # (B) Overlay: Ours vs GY ribbon on test
+    # (B) Overlay: Ours vs Parametric TI ribbon on test
     # ----------------------------
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(1, 1, 1)
@@ -445,8 +445,8 @@ def main():
     ax.scatter(x_test_s, y_test_s, s=6, alpha=0.15)
 
     # draw ribbons (order matters)
-    ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.25, label=f"GY (content={gy_content:.3f}, width={gy_width:.3f})")
-    ax.fill_between(x_test_s, ours_lo, ours_up, alpha=0.25, label=f"Ours (content={ours_content:.3f}, width={ours_width:.3f})")
+    ax.fill_between(x_test_s, gy_lo, gy_up, alpha=0.25, label=f"Parametric TI (content={gy_content:.3f}, width={gy_width:.3f})")
+    ax.fill_between(x_test_s, ours_lo, ours_up, alpha=0.25, label=f"HCTI (content={ours_content:.3f}, width={ours_width:.3f})")
 
     ax.set_title(f"Overlay TI on Happy B (seed={seed})")
     ax.set_xlabel("mag_r")

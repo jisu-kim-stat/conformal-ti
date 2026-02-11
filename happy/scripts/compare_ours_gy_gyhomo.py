@@ -233,7 +233,7 @@ def run_ours(
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
     mean_width = float(np.mean(upper - lower))
 
-    return dict(method="Ours", lambda_=lam, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
+    return dict(method="HCTI", lambda_=lam, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
 
 
 # ============================================================
@@ -327,7 +327,7 @@ def run_gy_hetero(
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
     mean_width = float(np.mean(upper - lower))
 
-    return dict(method="GY-hetero", lambda_=np.nan, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
+    return dict(method="Parametric TI-hetero", lambda_=np.nan, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
 
 
 # ============================================================
@@ -395,7 +395,7 @@ def run_gy_homo(
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
     mean_width = float(np.mean(upper - lower))
 
-    return dict(method="GY-homo", lambda_=np.nan, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
+    return dict(method="Parametric TI-homo", lambda_=np.nan, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
 
 
 # ============================================================

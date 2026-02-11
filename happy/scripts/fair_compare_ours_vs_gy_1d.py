@@ -247,8 +247,8 @@ def main():
     ours_width   = float(np.mean(up_ours - lo_ours))
     gy_width     = float(np.mean(up_gy - lo_gy))
 
-    print(f"[FAIR seed={seed}] Ours: lambda={lam_hat:.6f} content={ours_content:.6f} width={ours_width:.6f}")
-    print(f"[FAIR seed={seed}]   GY: df_eff={df_eff:.2f} nu={nu:.2f} est_var={est_var:.6f} content={gy_content:.6f} width={gy_width:.6f}")
+    print(f"[FAIR seed={seed}] HCTI: lambda={lam_hat:.6f} content={ours_content:.6f} width={ours_width:.6f}")
+    print(f"[FAIR seed={seed}]   Parametric TI: df_eff={df_eff:.2f} nu={nu:.2f} est_var={est_var:.6f} content={gy_content:.6f} width={gy_width:.6f}")
 
     # ============================
     # Plots: overlay + diagnostics
@@ -266,15 +266,15 @@ def main():
     plt.figure(figsize=(12, 5))
     plt.scatter(xs, ys, s=6, alpha=0.15)
     plt.fill_between(xs, loG, upG, alpha=0.25,
-                     label=f"GY (content={gy_content:.3f}, width={gy_width:.3f})")
+                     label=f"Parametric TI (content={gy_content:.3f}, width={gy_width:.3f})")
     plt.fill_between(xs, loO, upO, alpha=0.25,
-                     label=f"Ours (content={ours_content:.3f}, width={ours_width:.3f})")
+                     label=f"HCTI (content={ours_content:.3f}, width={ours_width:.3f})")
     plt.xlabel("mag_r")
     plt.ylabel("z_spec")
     plt.title(f"FAIR overlay on Happy B (seed={seed})")
     plt.legend()
     plt.tight_layout()
-    overlay_path = out_dir / f"fair_overlay_ours_vs_gy_seed{seed}.pdf"
+    overlay_path = out_dir / f"fair_overlay_HCTI_vs_PTI_seed{seed}.pdf"
     plt.savefig(overlay_path)
     plt.close()
 
@@ -303,12 +303,12 @@ def main():
     ax3 = plt.subplot(2, 2, 3)
     ax3.hist(r_cal, bins=40, alpha=0.9)
     ax3.axvline(lam_hat, linestyle="--", linewidth=2)
-    ax3.set_title("Ours: calibration r with lambda_hat")
+    ax3.set_title("HCTI: calibration r with lambda_hat")
     ax3.set_xlabel("r"); ax3.set_ylabel("count")
 
     ax4 = plt.subplot(2, 2, 4)
     ax4.hist(k_all, bins=40, alpha=0.9)
-    ax4.set_title("GY: k(x) distribution (train+cal points)")
+    ax4.set_title("Parametric TI: k(x) distribution (train+cal points)")
     ax4.set_xlabel("k"); ax4.set_ylabel("count")
 
     plt.suptitle(f"FAIR diagnostics (seed={seed}, n_sample={n_sample})", y=1.02)
