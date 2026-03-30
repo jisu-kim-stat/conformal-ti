@@ -17,9 +17,9 @@ generate_data <- function(model_id, n) {
     y <- base + noise
   }
   if (model_id == 6) {
-    noise <- ifelse(x < 5, rnorm(n, 1, 2), rnorm(n, -1, 2))
-    y <- base + noise
-  }
+  noise <- rchisq(n, df = 3) - 3   # E=0, skewness=2.83
+  y <- base + noise
+}
 
   data.frame(x = x, y = y)
 }

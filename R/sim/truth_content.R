@@ -14,9 +14,8 @@ content_function <- function(model_id, lower, upper, x) {
     return(pnorm(upper - y0, 0, sd_x) - pnorm(lower - y0, 0, sd_x))
   }
   if (model_id == 6) {
-    mean_x <- ifelse(x < 5, 1, -1)
-    return(pnorm(upper - y0, mean_x, 2) - pnorm(lower - y0, mean_x, 2))
-  }
+  return(pchisq(upper - y0 + 3, df = 3) - pchisq(lower - y0 + 3, df = 3))
+}
 
   stop("Unknown model.")
 }
