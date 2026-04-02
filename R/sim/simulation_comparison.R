@@ -46,7 +46,7 @@ generate_data <- function(model_id, n) {
   noise <- switch(as.character(model_id),
     "1" = rnorm(n, 0, sqrt(2)),
     "2" = rt(n, df = 3),
-    "3" = rnorm(n, 0, sqrt(2 * x)),
+    "3" = rnorm(n, 0, sqrt(2 * pmax(x, 0.01))),
     "4" = rnorm(n, 0, 0.3 + 3 * exp(-(x - 5)^2 / (2 * 1.5^2))),
     "5" = ifelse(x < 5,
                  rnorm(n, 0, 1 + 0.5 * x),
@@ -66,8 +66,7 @@ content_function <- function(model_id, lower, upper, x) {
 
   switch(as.character(model_id),
     "1" = pnorm(upper - y0, 0, sqrt(2))    - pnorm(lower - y0, 0, sqrt(2)),
-    "2" = pt((upper - y0) / sqrt(3/(3-2)), df = 3) -
-          pt((lower - y0) / sqrt(3/(3-2)), df = 3),
+    "2" = pt(upper - y0, df = 3) - pt(lower - y0, df = 3),
     "3" = pnorm(upper - y0, 0, sqrt(2 * x)) - pnorm(lower - y0, 0, sqrt(2 * x)),
     "4" = {
       sd_x <- 0.3 + 3 * exp(-(x - 5)^2 / (2 * 1.5^2))
@@ -110,48 +109,125 @@ predict_var <- function(fit_var, xnew) {
 #   n <= 200 : 단위벡터 반복 → 정확한 S
 #   n >  200 : fit$lev 근사  → 빠른 계산
 # ============================================================
-source("compute_spline_params.R")
+source("/home/jisukim/conformal-ti/R/sim/compute_spline_params.R")
 
 
 # ============================================================
-# 6. Pointwise k-factor (Guo & Young 식 14)
+# 6. Pointwise k-factor (Guo & Young 근사식 사용)
 # ============================================================
-compute_k2_ptw<- function(norm_lx_vec, nu, P, alpha,
-                                k_grid = seq(0.5, 15, by = 0.1)) {
+build_k_cache <- function(n_vec = c(50, 100, 200, 500),
+                           n_rep = 100,
+                           content = CONTENT,
+                           alpha   = ALPHA) {
+  cache <- list()
+
+  for (n in n_vec) {
+    cat(sprintf("n=%d 캐시 생성 중...\n", n))
+
+    params <- replicate(n_rep, {
+      dat  <- generate_data(1, n)
+      fit  <- fit_mean_model(dat$x, dat$y)
+      info <- compute_spline_params(dat$x, dat$y, fit$spar)
+      c(nu     = info$nu,
+        nl_min = min(info$norm_lx),
+        nl_max = max(info$norm_lx))
+    })
+
+    nu_med <- median(params["nu", ])
+    nl_min <- min(params["nl_min", ]) * 0.8
+    nl_max <- max(params["nl_max", ]) * 1.2
+
+    cat(sprintf("  nu=%.1f, nl=[%.3f, %.3f]\n", nu_med, nl_min, nl_max))
+
+    nl_grid <- seq(nl_min, nl_max, length.out = 30)
+
+    # nl 하나씩 직접 적분
+    k_values <- sapply(nl_grid, function(nl) {
+      upper_t <- max(6 * nl, 2.0)
+      k_grid  <- seq(0.5, 15, by = 0.1)
+
+      probs <- sapply(k_grid, function(k) {
+        val <- tryCatch(
+          integrate(function(t) {
+            ncp  <- pmin(t^2, 1e4)
+            q    <- qchisq(content, df = 1, ncp = ncp)
+            prob <- pchisq((nu_med * q) / k^2, df = nu_med,
+                           lower.tail = FALSE)
+            prob <- ifelse(is.nan(prob) | is.na(prob), 0, prob)
+            exp(-t^2 / (2 * nl^2)) * prob
+          }, 0, upper_t, subdivisions = 200, rel.tol = 1e-6)$value,
+          error = function(e) NA
+        )
+        if (is.na(val)) return(0)
+        (2 / (sqrt(2 * pi) * nl)) * val
+      })
+      k_grid[which.min(abs(probs - (1 - alpha)))]
+    })
+
+    cache[[as.character(n)]] <- list(
+      nu      = nu_med,
+      nl_grid = nl_grid,
+      k_vals  = k_values
+    )
+
+    cat(sprintf("  k=[%.3f, %.3f]\n", min(k_values), max(k_values)))
+  }
+
+  cache
+}
+
+lookup_k <- function(norm_lx_vec, n, cache) {
+  cc <- cache[[as.character(n)]]
+  approx(cc$nl_grid, cc$k_vals, xout = norm_lx_vec,
+         rule = 2)$y  # rule=2: 범위 벗어나면 끝값 사용
+}
+
+compute_k2_ptw_fixed <- function(norm_lx_vec, nu, P, alpha,
+                                  k_grid = seq(0.5, 15, by = 0.1),
+                                  nl_grid_n = 30) {  # 파라미터 추가
   gamma <- 1 - alpha
 
-  # norm_lx 격자 만들기
   nl_grid <- seq(min(norm_lx_vec) * 0.9,
                  max(norm_lx_vec) * 1.1,
-                 length.out = 30)
+                 length.out = nl_grid_n)  # 여기 적용
 
-  # 각 (nl, k) 조합에서 coverage 계산 → k 선택
   k_for_nl <- sapply(nl_grid, function(nl) {
+    upper_t <- max(6 * nl, 2.0)
+    
     probs <- sapply(k_grid, function(k) {
       val <- tryCatch(
         integrate(function(t) {
           ncp  <- pmin(t^2, 1e4)
-          q    <- qchisq(P, df=1, ncp=ncp)
-          prob <- pchisq((nu*q)/k^2, df=nu, lower.tail=FALSE)
-          prob <- ifelse(is.nan(prob)|is.na(prob), 0, prob)
-          exp(-t^2/(2*nl^2)) * prob
-        }, 0, 30, subdivisions=100, rel.tol=1e-4)$value,
-        error=function(e) NA
+          q    <- qchisq(P, df = 1, ncp = ncp)
+          prob <- pchisq((nu * q) / k^2, df = nu, lower.tail = FALSE)
+          prob <- ifelse(is.nan(prob) | is.na(prob), 0, prob)
+          exp(-t^2 / (2 * nl^2)) * prob
+        }, 0, upper_t, subdivisions = 200, rel.tol = 1e-6)$value,
+        error = function(e) NA
       )
-      if(is.na(val)) return(0)
-      (2/(nl^2 * pi)) * val
+      if (is.na(val)) return(0)
+      (2 / (sqrt(2 * pi) * nl)) * val
     })
     k_grid[which.min(abs(probs - gamma))]
   })
 
-  # norm_lx_vec에 대해 보간
   approx(nl_grid, k_for_nl, xout = norm_lx_vec)$y
 }
+
+system.time({
+  k_cache <- build_k_cache(
+    n_vec   = c(50, 100, 200, 500),
+    n_rep   = 100,
+    content = CONTENT,
+    alpha   = ALPHA
+  )
+  saveRDS(k_cache, "k_cache.rds")
+})
 
 # ============================================================
 # 7. Method 1: Parametric TI (homo) – Guo & Young 등분산
 # ============================================================
-one_rep_ptw_homo <- function(model_id, n, content, alpha) {
+one_rep_ptw_homo <- function(model_id, n, content, alpha, k_cache) {
 
   dat   <- generate_data(model_id, n)
   x <- dat$x; y <- dat$y
@@ -159,7 +235,7 @@ one_rep_ptw_homo <- function(model_id, n, content, alpha) {
   fit   <- fit_mean_model(x, y)
   info  <- compute_spline_params(x, y, fit$spar)  # 통합 계산
 
-  k_vec <- compute_k2_ptw(info$norm_lx, info$nu, content, alpha)
+  k_vec <- lookup_k(info$norm_lx, n, k_cache)  # 캐시에서 조회
 
   lower <- info$f_hat - k_vec * info$sigma_hat
   upper <- info$f_hat + k_vec * info$sigma_hat
@@ -175,7 +251,7 @@ one_rep_ptw_homo <- function(model_id, n, content, alpha) {
 # ============================================================
 # 8. Method 2: Parametric TI (hetero) – 이분산 추정 후 역변환
 # ============================================================
-one_rep_ptw_hetero <- function(model_id, n, content, alpha) {
+one_rep_ptw_hetero <- function(model_id, n, content, alpha, k_cache) {
 
   dat   <- generate_data(model_id, n)
   x <- dat$x; y <- dat$y
@@ -190,12 +266,12 @@ one_rep_ptw_hetero <- function(model_id, n, content, alpha) {
   z      <- (y - mu_hat) / sqrt(pmax(var_hat, 1e-8))
   fit_z  <- smooth.spline(x, z, cv = FALSE)
   info   <- compute_spline_params(x, z, fit_z$spar)  # 통합 계산
-
-  k_vec <- compute_k2_ptw(info$norm_lx, info$nu, content, alpha)
+  
+  k_vec <- lookup_k(info$norm_lx, n, k_cache)  # 캐시에서 조회
 
   # 역변환: 원래 스케일로
-  lower <- mu_hat + (info$f_hat - k_vec * info$sigma_hat) * sqrt(var_hat)
-  upper <- mu_hat + (info$f_hat + k_vec * info$sigma_hat) * sqrt(var_hat)
+  lower <- mu_hat - k_vec * info$sigma_hat * sqrt(var_hat)
+  upper <- mu_hat + k_vec * info$sigma_hat * sqrt(var_hat)  
 
   list(
     content   = content_function(model_id, lower, upper, x),
@@ -363,7 +439,7 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
         "fit_mean_model", "fit_var_model",
         "predict_mean", "predict_var",
         "compute_spline_params",
-        "compute_k2_ptw",
+        "lookup_k", "k_cache", 
         "hoeffding_lambda",
         "find_lambda_sym", "find_lambda_nonsym",
         "one_rep_ptw_homo", "one_rep_ptw_hetero",
@@ -373,8 +449,8 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
     ) %dorng% {
       tryCatch({
         r <- switch(method,
-          "Parametric (homo)"   = one_rep_ptw_homo(model_id, n, content, alpha),
-          "Parametric (hetero)" = one_rep_ptw_hetero(model_id, n, content, alpha),
+          "Parametric (homo)"   = one_rep_ptw_homo(model_id, n, content, alpha, k_cache),
+          "Parametric (hetero)" = one_rep_ptw_hetero(model_id, n, content, alpha, k_cache),
           "HCTI (sym)"          = one_rep_hcti_sym(model_id, n, content, alpha),
           "HCTI (nonsym)"       = one_rep_hcti_nonsym(model_id, n, content, alpha),
           stop("Unknown method")
@@ -402,7 +478,7 @@ run_one_setting <- function(model_id, n, M, content, alpha) {
     df_long %>%
       dplyr::group_by(x) %>%
       dplyr::summarise(
-        coverage   = mean(content >= content, na.rm = TRUE),
+        coverage   = mean(content >= CONTENT, na.rm = TRUE),
         mean_width = mean(width, na.rm = TRUE),
         na_prop    = mean(lambda_na == 1L),
         .groups    = "drop"
@@ -549,30 +625,53 @@ summary_table <- function(sim_df, content = CONTENT) {
 # ============================================================
 if (sys.nframe() == 0) {
 
-  # 빠른 테스트 (M=50, n=100만)
-  cat("=== 빠른 테스트 실행 (M=50) ===\n")
-  sim_res <- run_simulation(
-    models  = 1:6,
-    n_vec   = c(100),
-    M       = 50,
-    content = CONTENT,
-    alpha   = ALPHA,
-    n_cores = max(1, parallel::detectCores() - 1),
-    seed    = 2024
-  )
+  cat("=== Full Simulation (M=500) ===\n")
 
-  # 저장
-  saveRDS(sim_res, "sim_results.rds")
+  # 캐시 로드 또는 생성
+  if (file.exists("k_cache.rds")) {
+    cat("캐시 로드 중...\n")
+    k_cache <- readRDS("k_cache.rds")
+  } else {
+    cat("캐시 생성 중...\n")
+    system.time({
+      k_cache <- build_k_cache(n_vec = c(50, 100, 200, 500))
+    })
+    saveRDS(k_cache, "k_cache.rds")
+  }
 
-  # 플롯
+  cl <- makeCluster(39)
+  registerDoParallel(cl)
+  on.exit(stopCluster(cl))
+
+  total_start <- proc.time()
+
+  all_res <- list()
+  for (mod in 1:6) {
+    for (n in c(50, 100, 200, 500)) {
+      setting_start <- proc.time()
+      cat(sprintf("\n>>> Model %d, n=%d 시작...\n", mod, n))
+
+      res <- run_one_setting(mod, n, M = 500,
+                             content = CONTENT, alpha = ALPHA)
+      all_res[[length(all_res) + 1]] <- res
+
+      elapsed <- (proc.time() - setting_start)["elapsed"]
+      cat(sprintf("    완료! %.1f초 (%.1f분)\n", elapsed, elapsed / 60))
+    }
+  }
+
+  sim_res <- dplyr::bind_rows(all_res)
+
+  total_elapsed <- (proc.time() - total_start)["elapsed"]
+  cat(sprintf("\n=== 전체 완료! 총 %.1f분 ===\n", total_elapsed / 60))
+
+  saveRDS(sim_res, "sim_results_final.rds")
+
   p_cov <- plot_coverage(sim_res)
   p_wid <- plot_width(sim_res)
+  ggsave("fig_coverage_final.png", p_cov, width = 14, height = 16, dpi = 150)
+  ggsave("fig_width_final.png",    p_wid, width = 14, height = 16, dpi = 150)
 
-  ggsave("fig_coverage.png", p_cov, width = 12, height = 14, dpi = 150)
-  ggsave("fig_width.png",    p_wid, width = 12, height = 14, dpi = 150)
-
-  cat("\n--- 평균 Coverage 테이블 ---\n")
+  cat("\n--- Summary Table ---\n")
   print(summary_table(sim_res))
-
-  cat("\n완료! sim_results.rds, fig_coverage.png, fig_width.png 확인하세요.\n")
 }
