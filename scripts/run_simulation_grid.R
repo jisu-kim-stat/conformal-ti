@@ -11,21 +11,17 @@ source("R/packages.R")
 source("R/sim/base_mean.R")
 source("R/sim/data_generate.R")
 source("R/sim/truth_content.R")
-source("R/sim/fit_mean_var.R")
 
-## ---- ours ----
+# ---- methods ----
+source("R/sim/fit_hcti.R")
+source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")
-source("R/sim/intervals_ours.R")
-source("R/sim/one_replication_ours.R")
+source("R/sim/pti_utils.R")
+source("R/sim/one_replication.R")
 
-## ---- gy ----
-source("R/sim/gy_utils.R")
-source("R/sim/one_replication_gy.R")
-
-## ---- run setting ----
-source("R/sim/run_one_setting.R")     # <- (x별 coverage/mean_width/na_proportion 요약을 반환)
-source("R/utils/save_results.R")      # <- save_pointwise_csv()
-
+# ---- run setting ----
+source("R/sim/run_one_setting.R")
+source("R/utils/save_results.R")
 
 suppressPackageStartupMessages({
   library(parallel)
@@ -34,15 +30,19 @@ suppressPackageStartupMessages({
   library(foreach)
   library(dplyr)
 })
+
 # ---------------------------
 # Simulation setup
 # ---------------------------
-sample_sizes <- c(300, 500, 1000)
+#n_cal_vec <- c(200)     # first main run
+n_cal_vec <- c(200, 500, 1000)  # later sample-size trend
+
+n_test <- 1000
 models <- 1:6
 
-c <- 0.90          # content level
-alpha <- 0.05      # confidence error
-M <- 50            # number of replications
+content_level <- 0.90
+alpha <- 0.05
+M <- 200
 
 # ---------------------------
 # Parallel
@@ -52,65 +52,86 @@ cl <- makeCluster(n_cores)
 registerDoParallel(cl)
 registerDoRNG(123)
 
-
 clusterEvalQ(cl, {
   src <- function(p) source(p, local = .GlobalEnv)
 
-  src('R/packages.R')
+  src("R/packages.R")
 
-  src('R/sim/base_mean.R')
-  src('R/sim/data_generate.R')
-  src('R/sim/truth_content.R')
-  src('R/sim/lambda_hoeffding.R')
-  src('R/sim/fit_mean_var.R')
-  src('R/sim/intervals_ours.R')
+  src("R/sim/base_mean.R")
+  src("R/sim/data_generate.R")
+  src("R/sim/truth_content.R")
 
-  src('R/sim/one_replication_ours.R')
-  src('R/sim/one_replication_gy.R')
-  src('R/sim/run_one_setting.R')
-  src('R/sim/gy_utils.R')
+  src("R/sim/fit_hcti.R")
+  src("R/sim/fit_cqr.R")
+  src("R/sim/lambda_hoeffding.R")
+  src("R/sim/pti_utils.R")
+  src("R/sim/one_replication.R")
+  src("R/sim/run_one_setting.R")
 
   NULL
 })
 
-
-
 # ---------------------------
-# Run (grid)
+# Run grid
 # ---------------------------
-all_df <- list()
-
-all_df <- list()
-
-models <- 1:6   # data_generate.R에 정의된 모델 개수로
+all_pointwise <- list()
+all_marginal  <- list()
+all_px_good   <- list()
 
 for (model_id in models) {
-  for (n in sample_sizes) {
-    cat("[START] model:", model_id, "n:", n, "\n")
+  for (n_cal in n_cal_vec) {
 
-    df_one <- run_one_setting(
+    n_train <- n_cal
+
+    cat(
+      "[START] model:", model_id,
+      "n_train:", n_train,
+      "n_cal:", n_cal,
+      "n_test:", n_test,
+      "\n"
+    )
+
+    res_one <- run_one_setting(
       model_id = model_id,
-      n        = n,
+      n_train  = n_train,
+      n_cal    = n_cal,
+      n_test   = n_test,
       M        = M,
-      c        = c,
+      content  = content_level,
       alpha    = alpha
     )
 
-    key <- paste0("Model_", model_id, "_n_", n)
-    all_df[[key]] <- df_one
+    key <- paste0(
+      "Model_", model_id,
+      "_ntrain_", n_train,
+      "_ncal_", n_cal,
+      "_ntest_", n_test
+    )
+
+    all_pointwise[[key]] <- res_one$pointwise
+    all_marginal[[key]]  <- res_one$marginal
+    all_px_good[[key]]   <- res_one$px_good
   }
 }
-
 
 stopCluster(cl)
 
 # ---------------------------
 # Save
 # ---------------------------
-pointwise_df <- bind_rows(all_df) %>%
-  dplyr::select(x, coverage, mean_width, na_proportion, model, n, Method)
+pointwise_df <- dplyr::bind_rows(all_pointwise)
+marginal_df  <- dplyr::bind_rows(all_marginal)
+px_good_df   <- dplyr::bind_rows(all_px_good)
 
-out_path <- "results/sim/models/pointwise_df_ours_vs_gy.csv"
-save_pointwise_csv(pointwise_df, out_path)
+pointwise_path <- "results/sim/models/pointwise_success_hcti_cqr_pti_ncal_grid.csv"
+marginal_path  <- "results/sim/models/marginal_pac_hcti_cqr_pti_ncal_grid.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_hcti_cqr_pti_ncal_grid.csv"
 
-cat("Saved to:", out_path, "\n")
+
+readr::write_csv(pointwise_df, pointwise_path)
+readr::write_csv(marginal_df, marginal_path)
+readr::write_csv(px_good_df, px_good_path)
+
+cat("Saved pointwise to:", pointwise_path, "\n")
+cat("Saved marginal to:", marginal_path, "\n")
+cat("Saved PX-good to:", px_good_path, "\n")
