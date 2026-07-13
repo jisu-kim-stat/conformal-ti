@@ -1,5 +1,8 @@
 suppressPackageStartupMessages({
   library(gam)
+  library(mgcv)
+  library(glmnet)
+  library(quantreg)
   library(dplyr)
   library(ggplot2)
   library(tidyr)
