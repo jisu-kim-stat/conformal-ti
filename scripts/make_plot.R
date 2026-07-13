@@ -12,6 +12,8 @@ suppressPackageStartupMessages({
 pointwise_path <- "results/sim/models/pointwise_success_hcti_cqr_pti_ncal_grid.csv"
 marginal_path  <- "results/sim/models/marginal_pac_hcti_cqr_pti_ncal_grid.csv"
 px_good_path   <- "results/sim/models/px_good_proportion_hcti_cqr_pti_ncal_grid.csv"
+
+
 out_dir <- "results/sim/models/plots"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 

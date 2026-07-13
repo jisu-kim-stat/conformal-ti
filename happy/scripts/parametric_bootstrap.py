@@ -252,7 +252,7 @@ def run_ours(
     content = float(np.mean((y_test >= lower) & (y_test <= upper)))
     mean_width = float(np.mean(upper - lower))
 
-    return dict(method="Ours", lambda_=lam, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
+    return dict(method="HCTI", lambda_=lam, content=content, mean_width=mean_width, bootstrap_mult=bootstrap_mult)
 
 
 # ============================================================
@@ -319,7 +319,7 @@ def run_gy_1d_from_arrays(
     content = float(np.mean((y_test >= lower_test) & (y_test <= upper_test)))
     mean_width = float(np.mean(upper_test - lower_test))
 
-    return dict(method="GY(1D)", lambda_=np.nan, content=content, mean_width=mean_width)
+    return dict(method="Parametric TI(1D)", lambda_=np.nan, content=content, mean_width=mean_width)
 
 
 def run_gy_1d(
@@ -404,7 +404,7 @@ def run_many_seeds_bootstrap(
             n_sample=n_sample, seed=seed,
             bootstrap_mult=bootstrap_mult,
         )
-        r1["method"] = "Ours(1D mag_r)"
+        r1["method"] = "HCTI(1D mag_r)"
         r1["seed"] = seed
 
         # GY(1D mag_r)
@@ -415,7 +415,7 @@ def run_many_seeds_bootstrap(
             n_sample=n_sample, seed=seed,
             bootstrap_mult=bootstrap_mult,
         )
-        r2["method"] = "GY(1D mag_r)"
+        r2["method"] = "Parametric TI(1D mag_r)"
         r2["seed"] = seed
 
         rows.extend([r1, r2])

@@ -30,10 +30,16 @@ Key files:
 
 ### How to run
 
+#### Run Simulation (CP)
 From the **project root**:
 
 ```bash
 Rscript scripts/run_simulation_grid.R
+```
+
+#### Make a plot
+```bash
+Rscript scripts/make_plot.R
 ```
 
 ### Outputs

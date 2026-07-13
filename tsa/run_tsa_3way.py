@@ -311,7 +311,7 @@ class TSASplit:
     df_train: pd.DataFrame
     df_cal: pd.DataFrame
     df_test: pd.DataFrame
-    split_mode : str
+    split_mode: str
 
 def make_time_split(df: pd.DataFrame,
                     a_end: str = "2020-12-31",
@@ -484,8 +484,9 @@ def run_ours_1d(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFr
         print("  r quantiles:", rq)
 
 
-    return dict(method="Ours", lambda_=lam, content=content, 
-                mean_width=mean_width, lower=lower, upper=upper)
+    return dict(method="HCTI-hetero", lambda_=lam, content=content,
+            mean_width=mean_width, lower=lower, upper=upper)
+
 
 def run_ours_homo_1d(df_train: pd.DataFrame,
                      df_cal: pd.DataFrame,
@@ -560,14 +561,15 @@ def run_ours_homo_1d(df_train: pd.DataFrame,
     mean_width = float(np.mean(upper - lower))
 
     return dict(
-        method="Ours-homo",
+        method="HCTI-homo",
         lambda_=lam,
         sigma=sigma,
         content=content,
         mean_width=mean_width,
-        lower = lower,
-        upper = upper,
+        lower=lower,
+        upper=upper,
     )
+
 
 def run_ours_pspline_hetero(
     df_train: pd.DataFrame,
@@ -675,7 +677,7 @@ def run_ours_pspline_hetero(
         print("  upper   q:", q(upper))
 
     return dict(
-        method="Ours-PS-hetero",
+        method="HCTI-hetero(PS)",
         lambda_=float(lam),
         content=content,
         mean_width=mean_width,
@@ -755,13 +757,14 @@ def run_gy_homo(
         print("  upper  q:", _quantiles(upper))
 
     return dict(
-        method="GY-homo",
+        method="PTI-homo",
         lambda_=np.nan,
         content=content,
         mean_width=mean_width,
         lower=lower,
         upper=upper,
     )
+
 
 
 def run_gy_hetero(
@@ -877,13 +880,14 @@ def run_gy_hetero(
         print("  upper  q:", _quantiles(upper))
 
     return dict(
-        method="GY-hetero",
+        method="PTI-hetero",
         lambda_=np.nan,
         content=content,
         mean_width=mean_width,
         lower=lower,
         upper=upper,
     )
+
 
 # =========================
 # Runner
@@ -1062,12 +1066,4 @@ def main():
 
 
 if __name__ == "__main__":
-    df = load_tsa(DEFAULT_TSA_URL)
-    debug_scale_invariance(
-        df,
-        seed=1,
-        split_mode="random",
-        tf_mode="asinh",
-        scale_list=(1e5, 1e6, 1e7),
-    )
     main()
