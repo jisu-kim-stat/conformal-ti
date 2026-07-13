@@ -141,12 +141,12 @@ For each setting `(model_id, n_train, n_cal)`, the simulation repeats the follow
 6. Construct tolerance intervals over the test grid.
 7. Evaluate true conditional content and interval width.
 
-For each test point \(x_j\), the simulation estimates
+For each test point $x_j$, the simulation estimates
 
-\[
+$$
 \widehat{P}_D
 \left[
-P_{Y|X=x_j}\{Y \in T(x_j;D)\} \ge C
+P_{Y \mid X=x_j}\{Y \in T(x_j;D)\} \ge C
 \right]
 =
 \frac{1}{M}
@@ -155,7 +155,7 @@ P_{Y|X=x_j}\{Y \in T(x_j;D)\} \ge C
 \left\{
 \operatorname{content}^{(b)}(x_j) \ge C
 \right\}.
-\]
+$$
 
 ---
 
@@ -165,43 +165,43 @@ The simulation produces three main summaries.
 
 #### 1. Marginal PAC success
 
-For each replication \(b\), marginal content is approximated over the test points:
+For each replication $b$, marginal content is approximated over the test points:
 
-\[
+$$
 \operatorname{marginal\_content}^{(b)}
 =
 \frac{1}{n_{\text{test}}}
 \sum_{j=1}^{n_{\text{test}}}
 \operatorname{content}^{(b)}(x_j).
-\]
+$$
 
 The reported marginal PAC success is
 
-\[
+$$
 \frac{1}{M}
 \sum_{b=1}^{M}
 \mathbf{1}
 \left\{
 \operatorname{marginal\_content}^{(b)} \ge C
 \right\}.
-\]
+$$
 
 This estimates
 
-\[
+$$
 P_D
 \left\{
 P_{X,Y}\{Y \in T(X;D)\} \ge C
 \right\}.
-\]
+$$
 
-The target is at least \(1-\alpha\).
+The target is at least $1-\alpha$.
 
-#### 2. \(P_X\)-good proportion
+#### 2. $P_X$-good proportion
 
-For each test point \(x_j\), define the pointwise PAC success estimate:
+For each test point $x_j$, define the pointwise PAC success estimate:
 
-\[
+$$
 \widehat{p}(x_j)
 =
 \frac{1}{M}
@@ -210,48 +210,48 @@ For each test point \(x_j\), define the pointwise PAC success estimate:
 \left\{
 \operatorname{content}^{(b)}(x_j) \ge C
 \right\}.
-\]
+$$
 
-The \(P_X\)-good proportion is
+The $P_X$-good proportion is
 
-\[
+$$
 \frac{1}{n_{\text{test}}}
 \sum_{j=1}^{n_{\text{test}}}
 \mathbf{1}
 \left\{
 \widehat{p}(x_j) \ge 1-\alpha
 \right\}.
-\]
+$$
 
 This estimates
 
-\[
+$$
 P_X
 \left\{
 x:
 P_D
 \left[
-P_{Y|X=x}\{Y \in T(x;D)\} \ge C
+P_{Y \mid X=x}\{Y \in T(x;D)\} \ge C
 \right]
 \ge 1-\alpha
 \right\}.
-\]
+$$
 
-This quantity is used to empirically assess the \(P_X\)-averaged conditional PAC behavior.
+This quantity is used to empirically assess the $P_X$-averaged conditional PAC behavior.
 
 #### 3. Average interval width
 
 For each replication,
 
-\[
+$$
 \operatorname{average\_width}^{(b)}
 =
 \frac{1}{n_{\text{test}}}
 \sum_{j=1}^{n_{\text{test}}}
 |T^{(b)}(x_j)|.
-\]
+$$
 
-The reported average width is the Monte Carlo mean over \(b=1,\ldots,M\).
+The reported average width is the Monte Carlo mean over $b=1,\ldots,M$.
 
 ---
 
@@ -320,7 +320,7 @@ Columns:
 - `n_test` : number of test points
 - `Method` : `"HCTI"`, `"CQR-TI"`, or `"Parametric-TI"`
 
-#### \(P_X\)-good results
+#### $P_X$-good results
 
 ```text
 results/sim/models/px_good_proportion_hcti_cqr_pti_ncal_grid.csv
@@ -364,7 +364,7 @@ Main figures:
 - `mean_conditional_content_curve_models1to5.png`
 - `pointwise_width_curve_models1to5.png`
 
-Model 6 is high-dimensional, so pointwise curves are excluded from the main pointwise plots. Its marginal and \(P_X\)-good summaries are saved separately.
+Model 6 is high-dimensional, so pointwise curves are excluded from the main pointwise plots. Its marginal and $P_X$-good summaries are saved separately.
 
 ---
 
@@ -373,15 +373,15 @@ Model 6 is high-dimensional, so pointwise curves are excluded from the main poin
 - HCTI and CQR-TI use split data: training data for nuisance fitting and calibration data for score calibration.
 - Parametric-TI is fitted using the full fitting sample `n_train + n_cal`.
 - The Hoeffding/DKW correction can be conservative for moderate calibration sizes.
-- With \(C=0.90\) and \(\alpha=0.05\),
+- With $C=0.90$ and $\alpha=0.05$,
 
-\[
+$$
 \lambda_\alpha
 =
 \sqrt{
 \frac{\log(2/\alpha)}{2n_{\text{cal}}}
 }.
-\]
+$$
 
 Thus, increasing `n_cal` decreases the correction and typically reduces interval width.
 - Results under `results/`, `*.csv`, and `*.png` are excluded from version control.
