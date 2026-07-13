@@ -144,19 +144,10 @@ For each setting `(model_id, n_train, n_cal)`, the simulation repeats the follow
 For each test point $x_j$, the simulation estimates
 
 $$
-\widehat{P}_D
-\left[
-P_{Y \mid X=x_j}\{Y \in T(x_j;D)\} \ge C
-\right]
+\widehat{P}_D\left[P_{Y \mid X=x_j}\left\{Y \in T(x_j;D)\right\} \ge C\right]
 =
-\frac{1}{M}
-\sum_{b=1}^{M}
-\mathbf{1}
-\left\{
-\operatorname{content}^{(b)}(x_j) \ge C
-\right\}.
+\frac{1}{M}\sum_{b=1}^{M}\mathbf{1}\left\{\operatorname{content}^{(b)}(x_j) \ge C\right\}.
 $$
-
 ---
 
 ### Reported metrics
