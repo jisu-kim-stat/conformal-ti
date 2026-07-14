@@ -177,62 +177,111 @@ ggsave(
 )
 
 # ============================================================
-# Plot 3: PX-good proportion
+# Plot 3: PX-good proportion by epsilon
 # This estimates:
-#   P_X{x : P_D[content(x;D) >= C] >= 1-alpha}
-# For Notion 3, this should approach 1 asymptotically.
+#   P_D{ P_{X,Y}(Y in T(X;D)) >= C - epsilon }
+# Target: >= 1 - alpha = 0.95
 # ============================================================
 
-p_px_good <- ggplot(
+px_good_df <- px_good_df %>%
+  dplyr::mutate(
+    epsilon = as.numeric(epsilon),
+    epsilon_label = paste0("epsilon = ", epsilon)
+  )
+
+# ----------------------------------------------------------
+# 1. One plot faceted by epsilon
+# ----------------------------------------------------------
+
+p_px_eps <- ggplot(
   px_good_df,
   aes(
     x = n_cal,
     y = px_good_proportion,
     color = Method,
+    shape = Method,
     group = Method
   )
 ) +
-  geom_point(
-  aes(shape = Method),
-  size = 3.0,
-  alpha = 0.85,
-  position = pd
-) +
-  geom_hline(
-    yintercept = 1.0,
-    linetype = "dashed",
-    color = "black"
-  ) +
-  facet_wrap(~ model, labeller = label_both) +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  geom_line(linewidth = 1.0) +
+  geom_point(size = 2.6, alpha = 0.9) +
+  facet_grid(epsilon_label ~ model) +
   scale_x_continuous(breaks = sort(unique(px_good_df$n_cal))) +
-  scale_y_continuous(limits = c(0, 1)) +
+  coord_cartesian(ylim = c(0, 1.02)) +
   labs(
-    title = "PX-good proportion",
-    subtitle = paste0(
-      "Good x if P_D{content(x;D) >= ",
-      content_level,
-      "} >= ",
-      confidence_level
-    ),
+    title = "PX-good proportion by epsilon",
+    subtitle = "Good x if P_D{content(x;D) >= C - epsilon} >= 1 - alpha",
     x = "Calibration sample size",
-    y = "Proportion of good x values",
-    color = "Method"
+    y = "PX-good proportion"
   ) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "bottom")
-
-if (length(unique(px_good_df$n_cal)) > 1) {
-  p_px_good <- p_px_good +
-    geom_line(linewidth = 1.0)
-}
+  theme_bw(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 10)
+  )
 
 ggsave(
-  filename = file.path(out_dir, "px_good_proportion_vs_ncal.png"),
-  plot = p_px_good,
-  width = 12,
-  height = 7,
+  filename = file.path(out_dir, "px_good_proportion_vs_ncal_by_epsilon.png"),
+  plot = p_px_eps,
+  width = 14,
+  height = 10,
   dpi = 300
 )
+
+# ----------------------------------------------------------
+# 2. Separate plot for each epsilon
+# ----------------------------------------------------------
+
+for (eps in sort(unique(px_good_df$epsilon))) {
+
+  df_eps <- px_good_df %>%
+    dplyr::filter(epsilon == eps)
+
+  p <- ggplot(
+    df_eps,
+    aes(
+      x = n_cal,
+      y = px_good_proportion,
+      color = Method,
+      shape = Method,
+      group = Method
+    )
+  ) +
+    geom_hline(yintercept = 1, linetype = "dashed") +
+    geom_line(linewidth = 1.0) +
+    geom_point(size = 2.8, alpha = 0.9) +
+    facet_wrap(~ model, nrow = 2) +
+    scale_x_continuous(breaks = sort(unique(df_eps$n_cal))) +
+    coord_cartesian(ylim = c(0, 1.02)) +
+    labs(
+      title = paste0("PX-good proportion, epsilon = ", eps),
+      subtitle = paste0(
+        "Good x if P_D{content(x;D) >= ",
+        content_level, " - ", eps,
+        "} >= ", confidence_level
+      ),
+      x = "Calibration sample size",
+      y = "PX-good proportion"
+    ) +
+    theme_bw(base_size = 13) +
+    theme(
+      legend.position = "bottom"
+    )
+
+  eps_name <- gsub("\\.", "p", as.character(eps))
+
+  ggsave(
+    filename = file.path(
+      out_dir,
+      paste0("px_good_proportion_vs_ncal_epsilon_", eps_name, ".png")
+    ),
+    plot = p,
+    width = 13,
+    height = 7.5,
+    dpi = 300
+  )
+}
 
 # ============================================================
 # Plot 4: Average interval width
@@ -286,8 +335,19 @@ ggsave(
 # target line: 1-alpha = 0.95
 # ============================================================
 
+# ============================================================
+# Plot 5: Pointwise PAC success curve, models 1--5 only
+# epsilon = 0 only
+# y-axis:
+#   P_D{content(x;D) >= C}
+# target line: 1-alpha = 0.95
+# ============================================================
+
 pointwise_plot_df <- pointwise_df %>%
-  filter(model != 6)
+  filter(
+    model != 6,
+    epsilon == 0
+  )
 
 p_pointwise_success <- ggplot(
   pointwise_plot_df,
@@ -328,7 +388,7 @@ p_pointwise_success <- ggplot(
   theme(legend.position = "bottom")
 
 ggsave(
-  filename = file.path(out_dir, "pointwise_pac_success_curve_models1to5.png"),
+  filename = file.path(out_dir, "pointwise_pac_success_curve_models1to5_epsilon0.png"),
   plot = p_pointwise_success,
   width = 14,
   height = 9,
@@ -337,12 +397,18 @@ ggsave(
 
 # ============================================================
 # Plot 6: Mean conditional content curve, models 1--5 only
-# This is auxiliary: average of content(x;D) over D.
+# epsilon = 0 only, because mean_content does not depend on epsilon
 # Target line: C = 0.90
 # ============================================================
 
+mean_content_plot_df <- pointwise_df %>%
+  filter(
+    model != 6,
+    epsilon == 0
+  )
+
 p_mean_content <- ggplot(
-  pointwise_plot_df,
+  mean_content_plot_df,
   aes(
     x = x,
     y = mean_content,
