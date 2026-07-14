@@ -42,6 +42,8 @@ models <- 1:6
 
 content_level <- 0.90
 alpha <- 0.05
+epsilon_grid <- c(0, 0.01, 0.02, 0.03, 0.05)
+
 M <- 200
 
 # ---------------------------
@@ -98,7 +100,8 @@ for (model_id in models) {
       n_test   = n_test,
       M        = M,
       content  = content_level,
-      alpha    = alpha
+      alpha    = alpha,
+      epsilon_grid = epsilon_grid
     )
 
     key <- paste0(
