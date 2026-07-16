@@ -1,120 +1,113 @@
+# PAC-Calibrated Regression Tolerance Intervals
+
+This repository contains simulation and real-data code for regression tolerance intervals with marginal PAC calibration and conditional PAC diagnostics.
+
+## Methods
+
+The repository compares four methods:
+
+- **Parametric TI**: spline-based model benchmark
+- **HCTI**: symmetric standardized residual score
+- **HCTI-asym**: asymmetric standardized residual score
+- **CQR-TI**: quantile-regression score
+
+The PAC-calibrated methods use the empirical \((C+\lambda_\alpha)\)-quantile of calibration scores, where
+
+```text
+lambda_alpha = sqrt(log(2 / alpha) / (2 * n_cal))
+```
+
+Default Settings : 
+```text
+content_level = 0.90
+pac_alpha     = 0.05
+```
+
+## Structure
+```text
+ti_project/
+├── data/
+│   └── real/
+│       └── redshift/
+│           ├── happy_A
+│           └── happy_B
+├── scripts/
+│   ├── sim/
+│   └── real/
+│       ├── redshift/
+│       └── tsa/
+├── results/
+│   ├── sim/
+│   └── real/
+│       ├── redshift/
+│       └── tsa/
+├── fig/
+│   ├── sim/
+│   │   ├── uniform/
+│   │   └── normal/
+│   └── real/
+│       ├── redshift/
+│       └── tsa/
+└── README.md
+```
+
 ## Simulation
-
-This repository includes simulation code for comparing:
-
-- **HCTI**: Hoeffding-Conformal Tolerance Interval
-- **CQR-TI**: CQR-based Tolerance Interval
-- **Parametric-TI**: spline-based parametric tolerance interval baseline
-
-### Structure
-
+Simulation scripts are in:
 ```text
-R/sim/      core simulation functions
-R/utils/    plotting and saving utilities
-scripts/    runnable scripts
+scripts/sim/
 ```
 
-Main files:
+Main scripts:
+```
+scripts/sim/run_simulation_grid_alt_dgp.R
+scripts/sim/make_plot_alt_dgp.R
+```
 
+Run from the project root:
 ```text
-R/sim/data_generate.R
-R/sim/truth_content.R
-R/sim/fit_hcti.R
-R/sim/fit_cqr.R
-R/sim/lambda_hoeffding.R
-R/sim/one_replication.R
-R/sim/run_one_setting.R
-scripts/run_simulation_grid.R
-scripts/make_plot.R
+Rscript scripts/sim/run_simulation_grid_alt_dgp.R
+Rscript scripts/sim/make_plot_alt_dgp.R
 ```
 
-### Settings
+## Real Data
+The repository includes two real-data applications:
+1. Reashift Data
+2. TSA passenger throughput data
 
-```r
-content_level <- 0.90
-alpha <- 0.05
-n_test <- 1000
-n_cal_vec <- c(200, 500, 1000)
-models <- 1:6
-```
-
-Inside the simulation grid:
-
-```r
-n_train <- n_cal
-```
-
-### Metrics
-
-The simulation reports:
-
-```text
-1. Marginal PAC success
-2. PX-good proportion
-3. Average interval width
-```
-
-For models 1--5, pointwise curves are plotted over the one-dimensional test grid.
-
-For model 6, which is high-dimensional, only summary metrics are reported.
-
-### Run
-
-From the project root:
-
+#### Redshift
+Run : 
 ```bash
-Rscript scripts/run_simulation_grid.R
+python scripts/real/redshift/real_redshift_4methods.py
 ```
-
-Then create plots:
-
+Plot :
 ```bash
-Rscript scripts/make_plot.R
+python scripts/real/redshift/plot_redshift_4methods.py \
+  --summary results/real/redshift/results_redshift_4methods.csv \
+  --out_dir fig/real/redshift \
+  --content_level 0.90
 ```
 
-Open plots on macOS:
-
+### TSA
+Run : 
 ```bash
-open results/sim/models/plots
+python scripts/real/tsa/real_tsa_4methods.py \
+  --split_mode random
+```
+Plot :
+```bash
+python scripts/real/tsa/plot_tsa_4methods.py \
+  --summary results/real/tsa/results_tsa_4methods.csv \
+  --intervals results/real/tsa/results_tsa_4methods_intervals.csv \
+  --out_dir fig/real/tsa \
+  --content_level 0.90 \
+  --window 14
 ```
 
-### Outputs
-
-CSV outputs:
-
-```text
-results/sim/models/pointwise_success_hcti_cqr_pti_ncal_grid.csv
-results/sim/models/marginal_pac_hcti_cqr_pti_ncal_grid.csv
-results/sim/models/px_good_proportion_hcti_cqr_pti_ncal_grid.csv
-```
-
-Plot outputs:
-
-```text
-results/sim/models/plots/
-```
-
-Main plot files:
-
-```text
-marginal_pac_success_vs_ncal.png
-mean_marginal_content_vs_ncal.png
-px_good_proportion_vs_ncal.png
-average_width_vs_ncal.png
-pointwise_pac_success_curve_models1to5.png
-mean_conditional_content_curve_models1to5.png
-pointwise_width_curve_models1to5.png
-```
-
-### Notes
-
-```text
-- HCTI and CQR-TI use split data.
-- Parametric-TI uses the full fitting sample.
-- The Hoeffding/DKW correction can be conservative for small calibration sizes.
-- Larger n_cal usually reduces interval width.
-- results/, *.csv, and *.png are excluded from version control.
-```
+## Notes
+- PAC-calibrated methods use split data.
+- Parametric TI is a model-based benchmark.
+- Real-data results report empirical content, not true conditional coverage.
+- fig/, results/, *.csv, and *.png are generated artifacts.
 
 ## References
 

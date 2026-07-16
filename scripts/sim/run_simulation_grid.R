@@ -44,7 +44,9 @@ content_level <- 0.90
 alpha <- 0.05
 epsilon_grid <- c(0, 0.01, 0.02, 0.03, 0.05)
 
-M <- 200
+M <- 50
+
+design_vec <- c("uniform", "normal")
 
 # ---------------------------
 # Parallel
@@ -80,40 +82,46 @@ all_pointwise <- list()
 all_marginal  <- list()
 all_px_good   <- list()
 
-for (model_id in models) {
-  for (n_cal in n_cal_vec) {
+for (design in design_vec) {
+  for (model_id in models) {
+    for (n_cal in n_cal_vec) {
 
-    n_train <- n_cal
+      n_train <- n_cal
 
-    cat(
-      "[START] model:", model_id,
-      "n_train:", n_train,
-      "n_cal:", n_cal,
-      "n_test:", n_test,
-      "\n"
-    )
+      cat(
+        "[START] design:", design,
+        "model:", model_id,
+        "n_train:", n_train,
+        "n_cal:", n_cal,
+        "n_test:", n_test,
+        "\n"
+      )
 
-    res_one <- run_one_setting(
-      model_id = model_id,
-      n_train  = n_train,
-      n_cal    = n_cal,
-      n_test   = n_test,
-      M        = M,
-      content  = content_level,
-      alpha    = alpha,
-      epsilon_grid = epsilon_grid
-    )
+      res_one <- run_one_setting(
+        model_id = model_id,
+        n_train  = n_train,
+        n_cal    = n_cal,
+        n_test   = n_test,
+        M        = M,
+        content  = content_level,
+        alpha    = alpha,
+        epsilon_grid = epsilon_grid,
+        design = design,
+        n_bins = 50
+      )
 
-    key <- paste0(
-      "Model_", model_id,
-      "_ntrain_", n_train,
-      "_ncal_", n_cal,
-      "_ntest_", n_test
-    )
+      key <- paste0(
+        "Design_", design,
+        "_Model_", model_id,
+        "_ntrain_", n_train,
+        "_ncal_", n_cal,
+        "_ntest_", n_test
+      )
 
-    all_pointwise[[key]] <- res_one$pointwise
-    all_marginal[[key]]  <- res_one$marginal
-    all_px_good[[key]]   <- res_one$px_good
+      all_pointwise[[key]] <- res_one$pointwise
+      all_marginal[[key]]  <- res_one$marginal
+      all_px_good[[key]]   <- res_one$px_good
+    }
   }
 }
 
@@ -126,10 +134,9 @@ pointwise_df <- dplyr::bind_rows(all_pointwise)
 marginal_df  <- dplyr::bind_rows(all_marginal)
 px_good_df   <- dplyr::bind_rows(all_px_good)
 
-pointwise_path <- "results/sim/models/pointwise_success_hcti_cqr_pti_ncal_grid.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_cqr_pti_ncal_grid.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_cqr_pti_ncal_grid.csv"
-
+pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_design_uniform_normal.csv"
 
 readr::write_csv(pointwise_df, pointwise_path)
 readr::write_csv(marginal_df, marginal_path)
