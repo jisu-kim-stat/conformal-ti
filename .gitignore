@@ -23,19 +23,22 @@ __pycache__/
 *.pyo
 *.pyd
 
-# ===============================
-# Simulation outputs (중요)
-# ===============================
+# generated outputs
 results/
-output/
-outputs/
-figures/
-plots/
+fig/
+
+# generated file types
 *.csv
-*.rds
-*.RDS
 *.png
 *.pdf
+
+# system / cache
+.DS_Store
+__pycache__/
+*.pyc
+.Rhistory
+.RData
+.Rproj.user/
 
 # ===============================
 # Large temporary files
