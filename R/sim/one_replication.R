@@ -6,7 +6,7 @@
 #   - Parametric-TI
 #
 # Output:
-#   list(content, width, lambda_na)
+#   list(x, content, width, lambda_na)
 # --------------------------------------------------
 
 
@@ -21,7 +21,8 @@ one_replication_pti <- function(model_id,
                                 n_test = 1000,
                                 content,
                                 alpha,
-                                seed = NULL) {
+                                seed = NULL,
+                                design = 'grid') {
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -36,6 +37,7 @@ one_replication_pti <- function(model_id,
 
   if (model_id == 6) {
     return(list(
+      x = seq_len(n_test),
       content = rep(NA_real_, n_test),
       width = rep(NA_real_, n_test),
       lambda_na = rep(1L, n_test)
@@ -44,8 +46,8 @@ one_replication_pti <- function(model_id,
 
   n_fit <- n_train + n_cal
 
-  data_fit  <- generate_data(model_id, n_fit)
-  data_test <- generate_data(model_id, n_test)
+  data_fit  <- generate_data(model_id, n_fit, design = design)
+  data_test <- generate_eval_data(model_id, n_test, design = design)
 
   x <- data_fit$x
   y <- data_fit$y
@@ -115,6 +117,7 @@ one_replication_pti <- function(model_id,
   width_vec   <- upper - lower
 
   list(
+    x = x_test,
     content = content_vec,
     width = width_vec,
     lambda_na = rep(0L, n_test)
@@ -124,7 +127,7 @@ one_replication_pti <- function(model_id,
 
 # --------------------------------------------------
 # Our methods:
-#   HCTI and CQR-TI
+#   HCTI, HCTI-asym, CQR-TI
 # --------------------------------------------------
 one_replication_ours <- function(method,
                                  model_id,
@@ -133,9 +136,10 @@ one_replication_ours <- function(method,
                                  n_test = 1000,
                                  content,
                                  alpha,
-                                 seed = NULL) {
+                                 seed = NULL,
+                                 design = 'grid') {
 
-  method <- match.arg(method, c("HCTI", "CQR-TI"))
+  method <- match.arg(method, c("HCTI", "HCTI-asym", "CQR-TI"))
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -154,9 +158,9 @@ one_replication_ours <- function(method,
   # Generate train / calibration / test data separately
   # --------------------------------------------------
 
-  data_train <- generate_data(model_id, n_train)
-  data_cal   <- generate_data(model_id, n_cal)
-  data_test  <- generate_data(model_id, n_test)
+  data_train <- generate_data(model_id, n_train, design = design)
+  data_cal   <- generate_data(model_id, n_cal, design = design)
+  data_test <- generate_eval_data(model_id, n_test, design = design)
 
   extract_xy <- function(data, model_id) {
     y <- data$y
@@ -214,6 +218,7 @@ one_replication_ours <- function(method,
       lambda_na_vec[] <- 1L
 
       return(list(
+        x = test_x,
         content = content_vec,
         width = width_vec,
         lambda_na = lambda_na_vec
@@ -231,6 +236,82 @@ one_replication_ours <- function(method,
     width_vec   <- upper - lower
 
     return(list(
+      x = test_x,
+      content = content_vec,
+      width = width_vec,
+      lambda_na = lambda_na_vec
+    ))
+  }
+
+  # --------------------------------------------------
+  # HCTI-asym
+  # --------------------------------------------------
+
+  if (method == "HCTI-asym") {
+
+    tau_asym <- mis / 2
+
+    # fit nuisance models on training data
+    fit_mean <- fit_mean_model_auto(train_x, train_y, model_id)
+    fit_var  <- fit_var_model_auto(train_x, train_y, fit_mean, model_id)
+
+    # training standardized residuals for shape estimation
+    mu_train  <- predict_mean_auto(fit_mean, train_x, model_id)
+    var_train <- predict_var_auto(fit_var, train_x, model_id)
+
+    z_train <- (train_y - mu_train) / sqrt(pmax(var_train, 1e-8))
+
+    shape_hat <- find_asym_shape(
+      z = z_train,
+      tau = tau_asym,
+      eps = 1e-6
+    )
+
+    a_minus <- shape_hat["a_minus"]
+    a_plus  <- shape_hat["a_plus"]
+
+    # calibration standardized residuals
+    mu_cal  <- predict_mean_auto(fit_mean, cal_x, model_id)
+    var_cal <- predict_var_auto(fit_var, cal_x, model_id)
+
+    z_cal <- (cal_y - mu_cal) / sqrt(pmax(var_cal, 1e-8))
+
+    score_cal <- asym_residual_score(
+      z = z_cal,
+      a_minus = a_minus,
+      a_plus = a_plus
+    )
+
+    q_hat <- find_score_cutoff(
+      mis = mis,
+      alpha = alpha,
+      score = score_cal
+    )
+
+    if (is.na(q_hat)) {
+      lambda_na_vec[] <- 1L
+
+      return(list(
+        x = test_x,
+        content = content_vec,
+        width = width_vec,
+        lambda_na = lambda_na_vec
+      ))
+    }
+
+    # evaluate intervals on test points
+    mu_test  <- predict_mean_auto(fit_mean, test_x, model_id)
+    var_test <- predict_var_auto(fit_var, test_x, model_id)
+    sd_test  <- sqrt(pmax(var_test, 1e-8))
+
+    lower <- mu_test - q_hat * a_minus * sd_test
+    upper <- mu_test + q_hat * a_plus  * sd_test
+
+    content_vec <- content_function(model_id, lower, upper, test_x)
+    width_vec   <- upper - lower
+
+    return(list(
+      x = test_x,
       content = content_vec,
       width = width_vec,
       lambda_na = lambda_na_vec
@@ -269,6 +350,7 @@ one_replication_ours <- function(method,
       lambda_na_vec[] <- 1L
 
       return(list(
+        x = test_x,
         content = content_vec,
         width = width_vec,
         lambda_na = lambda_na_vec
@@ -286,6 +368,7 @@ one_replication_ours <- function(method,
     width_vec   <- upper - lower
 
     return(list(
+      x = test_x,
       content = content_vec,
       width = width_vec,
       lambda_na = lambda_na_vec
