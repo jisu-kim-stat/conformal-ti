@@ -12,6 +12,7 @@ suppressPackageStartupMessages({
 pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
 marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
 px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+
 out_dir <- "results/sim/models/plots_alt_dgp"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -94,9 +95,14 @@ method_linetypes <- c(
 # Read data
 # ============================================================
 
-pointwise_df <- readr::read_csv(pointwise_path, show_col_types = FALSE)
-marginal_df  <- readr::read_csv(marginal_path, show_col_types = FALSE)
-px_good_df   <- readr::read_csv(px_good_path, show_col_types = FALSE)
+pointwise_df <- readr::read_csv(pointwise_path, show_col_types = FALSE) %>%
+  dplyr::filter(Method != "NCQR-TI")
+
+marginal_df <- readr::read_csv(marginal_path, show_col_types = FALSE) %>%
+  dplyr::filter(Method != "NCQR-TI")
+
+px_good_df <- readr::read_csv(px_good_path, show_col_types = FALSE) %>%
+  dplyr::filter(Method != "NCQR-TI")
 
 # ============================================================
 # Type cleanup and labels
@@ -112,8 +118,14 @@ pointwise_df <- pointwise_df %>%
     epsilon = as.numeric(epsilon),
     x_bin = as.integer(x_bin),
     Method = factor(Method, levels = method_levels),
-    model_lab = paste0("Model ", model),
-    ncal_lab = paste0("n_cal = ", n_cal)
+    model_lab = factor(
+      paste0("Model ", model),
+      levels = paste0("Model ", sort(unique(model)))
+    ),
+    ncal_lab = factor(
+      paste0("n_cal = ", n_cal),
+      levels = paste0("n_cal = ", sort(unique(n_cal)))
+    )
   )
 
 marginal_df <- marginal_df %>%

@@ -1,4 +1,4 @@
-# scripts/run_simulation_grid.R
+# scripts/run_simulation_grid_alt_dgp.R
 # ---------------------------
 # Always run from project root
 # ---------------------------
@@ -36,9 +36,7 @@ suppressPackageStartupMessages({
 # ---------------------------
 # Simulation setup
 # ---------------------------
-#n_cal_vec <- c(200)     # first main run
-n_cal_vec <- c(200, 500, 1000)  # later sample-size trend
-
+n_cal_vec <- c(200, 500, 1000)
 n_test <- 1000
 models <- 1:6
 
@@ -46,7 +44,7 @@ content_level <- 0.90
 alpha <- 0.05
 epsilon_grid <- c(0, 0.01, 0.02, 0.03, 0.05)
 
-M <- 200
+M <- 100
 
 design_vec <- c("uniform", "normal")
 
@@ -62,7 +60,6 @@ clusterEvalQ(cl, {
   src <- function(p) source(p, local = .GlobalEnv)
 
   src("R/packages.R")
-
   src("R/sim/base_mean.R")
 
   # Alternative DGPs
@@ -141,6 +138,7 @@ px_good_df   <- dplyr::bind_rows(all_px_good)
 pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
 marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
 px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+
 readr::write_csv(pointwise_df, pointwise_path)
 readr::write_csv(marginal_df, marginal_path)
 readr::write_csv(px_good_df, px_good_path)
