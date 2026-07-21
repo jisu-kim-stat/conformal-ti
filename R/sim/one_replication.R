@@ -35,15 +35,6 @@ one_replication_pti <- function(model_id,
     alpha > 0, alpha < 1
   )
 
-  if (model_id == 6) {
-    return(list(
-      x = seq_len(n_test),
-      content = rep(NA_real_, n_test),
-      width = rep(NA_real_, n_test),
-      lambda_na = rep(1L, n_test)
-    ))
-  }
-
   n_fit <- n_train + n_cal
 
   data_fit  <- generate_data(model_id, n_fit, design = design)
@@ -139,7 +130,7 @@ one_replication_ours <- function(method,
                                  seed = NULL,
                                  design = 'grid') {
 
-  method <- match.arg(method, c("HCTI", "HCTI-asym", "CQR-TI"))
+  method <- match.arg(method, c("HCTI", "HCTI-asym", "CQR-TI", "NCQR-TI"))
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -163,16 +154,10 @@ one_replication_ours <- function(method,
   data_test <- generate_eval_data(model_id, n_test, design = design)
 
   extract_xy <- function(data, model_id) {
-    y <- data$y
-
-    if (model_id == 6) {
-      x_cols <- paste0("x", 1:20)
-      x <- as.matrix(data[, x_cols, drop = FALSE])
-    } else {
-      x <- data$x
-    }
-
-    list(x = x, y = y)
+  list(
+    x = data$x,
+    y = data$y
+  )
   }
 
   train <- extract_xy(data_train, model_id)
@@ -374,4 +359,83 @@ one_replication_ours <- function(method,
       lambda_na = lambda_na_vec
     ))
   }
-}
+
+
+  # --------------------------------------------------
+  # NCQR-TI
+  # Tail-normalized CQR score
+  # --------------------------------------------------
+
+  if (method == "NCQR-TI") {
+
+    tau_lo_inner <- mis / 2
+    tau_hi_inner <- 1 - mis / 2
+
+    # More stable outer quantiles than 0.01 and 0.99
+    tau_lo_outer <- tau_lo_inner / 2
+    tau_hi_outer <- 1 - tau_lo_inner / 2
+
+    eps_scale <- 1e-6
+
+    # fit quantile models on training data
+    fit_qlo_outer <- fit_quantile_model_auto(train_x, train_y, tau_lo_outer, model_id)
+    fit_qlo_inner <- fit_quantile_model_auto(train_x, train_y, tau_lo_inner, model_id)
+    fit_qhi_inner <- fit_quantile_model_auto(train_x, train_y, tau_hi_inner, model_id)
+    fit_qhi_outer <- fit_quantile_model_auto(train_x, train_y, tau_hi_outer, model_id)
+
+    # calibration predictions
+    qlo_outer_cal <- predict_quantile_auto(fit_qlo_outer, cal_x, model_id)
+    qlo_inner_cal <- predict_quantile_auto(fit_qlo_inner, cal_x, model_id)
+    qhi_inner_cal <- predict_quantile_auto(fit_qhi_inner, cal_x, model_id)
+    qhi_outer_cal <- predict_quantile_auto(fit_qhi_outer, cal_x, model_id)
+
+    s_minus_cal <- pmax(qlo_inner_cal - qlo_outer_cal, eps_scale)
+    s_plus_cal  <- pmax(qhi_outer_cal - qhi_inner_cal, eps_scale)
+
+    score_cal <- pmax(
+      (qlo_inner_cal - cal_y) / s_minus_cal,
+      (cal_y - qhi_inner_cal) / s_plus_cal
+    )
+
+    q_hat <- find_score_cutoff(
+      mis = mis,
+      alpha = alpha,
+      score = score_cal
+    )
+
+    if (is.na(q_hat)) {
+      lambda_na_vec[] <- 1L
+
+      return(list(
+        x = test_x,
+        content = content_vec,
+        width = width_vec,
+        lambda_na = lambda_na_vec
+      ))
+    }
+
+    # test predictions
+    qlo_outer_test <- predict_quantile_auto(fit_qlo_outer, test_x, model_id)
+    qlo_inner_test <- predict_quantile_auto(fit_qlo_inner, test_x, model_id)
+    qhi_inner_test <- predict_quantile_auto(fit_qhi_inner, test_x, model_id)
+    qhi_outer_test <- predict_quantile_auto(fit_qhi_outer, test_x, model_id)
+
+    s_minus_test <- pmax(qlo_inner_test - qlo_outer_test, eps_scale)
+    s_plus_test  <- pmax(qhi_outer_test - qhi_inner_test, eps_scale)
+
+    lower <- qlo_inner_test - q_hat * s_minus_test
+    upper <- qhi_inner_test + q_hat * s_plus_test
+
+    content_vec <- content_function(model_id, lower, upper, test_x)
+    width_vec   <- upper - lower
+
+    return(list(
+      x = test_x,
+      content = content_vec,
+      width = width_vec,
+      lambda_na = lambda_na_vec
+    ))
+  }
+
+  stop("Method branch did not return output: ", method, call. = FALSE)
+  }

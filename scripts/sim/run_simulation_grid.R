@@ -134,9 +134,9 @@ pointwise_df <- dplyr::bind_rows(all_pointwise)
 marginal_df  <- dplyr::bind_rows(all_marginal)
 px_good_df   <- dplyr::bind_rows(all_px_good)
 
-pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_design_uniform_normal.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_design_uniform_normal.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_design_uniform_normal.csv"
+pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
 
 readr::write_csv(pointwise_df, pointwise_path)
 readr::write_csv(marginal_df, marginal_path)

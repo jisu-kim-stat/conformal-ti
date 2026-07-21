@@ -142,9 +142,8 @@ run_one_setting <- function(model_id,
         "one_replication_ours", "one_replication_pti",
         "base_mean", "generate_data", "content_function", "generate_eval_data",
         "fit_mean_model", "fit_var_model", "predict_mean", "predict_var",
-        "fit_mean_model_hd", "fit_var_model_hd", "predict_mean_hd", "predict_var_hd",
         "fit_mean_model_auto", "fit_var_model_auto", "predict_mean_auto", "predict_var_auto",
-        "fit_quantile_model", "predict_quantile", "fit_quantile_model_hd", "predict_quantile_hd",
+        "fit_quantile_model", "predict_quantile", 
         "fit_quantile_model_auto", "predict_quantile_auto",
         "find_lambda_hat", "find_score_cutoff", "find_k_factor", "find_asym_shape", "asym_residual_score"
       )
@@ -222,18 +221,15 @@ run_one_setting <- function(model_id,
 
   long_hcti <- run_method_long("HCTI")
   long_hcti_asym <- run_method_long("HCTI-asym")
-  long_cqr  <- run_method_long("CQR-TI")
+  long_cqr <- run_method_long("CQR-TI")
+  long_pti <- run_method_long("Parametric-TI")
 
   long_list <- list(
     "HCTI" = long_hcti,
     "HCTI-asym" = long_hcti_asym,
-    "CQR-TI" = long_cqr
+    "CQR-TI" = long_cqr,
+    "Parametric-TI" = long_pti
   )
-
-  if (model_id != 6) {
-    long_pti <- run_method_long("Parametric-TI")
-    long_list[["Parametric-TI"]] <- long_pti
-  }
 
   pointwise_df <- dplyr::bind_rows(
     lapply(names(long_list), function(method) {

@@ -49,17 +49,9 @@ predict_quantile_hd <- function(fit_quantile, xnew) {
 }
 
 fit_quantile_model_auto <- function(x, y, tau, model_id) {
-  if (model_id == 6) {
-    fit_quantile_model_hd(x, y, tau)
-  } else {
-    fit_quantile_model(x, y, tau)
-  }
+  fit_quantile_model(x, y, tau)
 }
 
 predict_quantile_auto <- function(fit_quantile, xnew, model_id) {
-  if (model_id == 6) {
-    predict_quantile_hd(fit_quantile, xnew)
-  } else {
-    predict_quantile(fit_quantile, xnew)
-  }
+  predict_quantile(fit_quantile, xnew)
 }

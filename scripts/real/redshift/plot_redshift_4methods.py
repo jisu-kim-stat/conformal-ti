@@ -8,13 +8,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-METHODS = ["Parametric TI", "HCTI", "HCTI-asym", "CQR-TI"]
+METHODS = ["HCTI", "HCTI-asym", "CQR-TI", "Parametric TI"]
 
 METHOD_COLORS = {
     "HCTI": "#D55E00",
     "HCTI-asym": "#CC79A7",
     "CQR-TI": "#0072B2",
     "Parametric TI": "#555555",
+}
+
+METHOD_MARKERS = {
+    "HCTI": "o",
+    "HCTI-asym": "o",
+    "CQR-TI": "^",
+    "Parametric TI": "s",
 }
 
 
@@ -40,8 +47,15 @@ def load_summary(path: str | Path) -> pd.DataFrame:
 def theme_axes(ax):
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+
     ax.grid(axis="y", color="0.88", linewidth=0.6)
+    ax.grid(axis="x", color="0.93", linewidth=0.5)
+
     ax.tick_params(axis="both", labelsize=9)
+    ax.title.set_fontsize(10)
+    ax.title.set_fontweight("bold")
+    ax.xaxis.label.set_fontsize(10)
+    ax.yaxis.label.set_fontsize(10)
 
 
 def savefig(path: str | Path):
@@ -78,8 +92,9 @@ def plot_happy_split_distribution(
             x,
             d["content"],
             s=18,
+            marker=METHOD_MARKERS[method],
             color=color,
-            alpha=0.45,
+            alpha=0.42,
             edgecolor="none",
         )
 
@@ -90,7 +105,7 @@ def plot_happy_split_distribution(
             x_base[j],
             m,
             yerr=s,
-            fmt="o",
+            fmt=METHOD_MARKERS[method],
             color=color,
             markeredgecolor="black",
             markeredgewidth=0.6,
@@ -105,6 +120,7 @@ def plot_happy_split_distribution(
             x,
             d["mean_width"],
             s=18,
+            marker=METHOD_MARKERS[method],
             color=color,
             alpha=0.45,
             edgecolor="none",
@@ -116,7 +132,7 @@ def plot_happy_split_distribution(
             x_base[j],
             m,
             yerr=s,
-            fmt="o",
+            fmt=METHOD_MARKERS[method],
             color=color,
             markeredgecolor="black",
             markeredgewidth=0.6,
@@ -129,7 +145,7 @@ def plot_happy_split_distribution(
     axes[0].axhline(content_level, linestyle="--", color="0.35", linewidth=1.0)
     axes[0].set_ylabel("Empirical content")
     axes[0].set_title("Empirical content over repeated splits")
-    axes[0].set_ylim(0.91, 0.94)
+    axes[0].set_ylim(0.895, 0.942)
     theme_axes(axes[0])
 
     axes[1].set_ylabel("Average interval width")
@@ -142,6 +158,7 @@ def plot_happy_split_distribution(
         "Happy photometric redshift data",
         fontsize=13,
         fontweight="bold",
+        y=0.995,
     )
 
     savefig(out_path)
@@ -160,7 +177,8 @@ def plot_happy_content_width_scatter(
             d["mean_width"],
             d["content"],
             s=28,
-            alpha=0.55,
+            marker=METHOD_MARKERS[method],
+            alpha=0.50,
             color=METHOD_COLORS[method],
             label=method,
             edgecolor="none",
@@ -170,6 +188,7 @@ def plot_happy_content_width_scatter(
             d["mean_width"].mean(),
             d["content"].mean(),
             s=95,
+            marker=METHOD_MARKERS[method],
             color=METHOD_COLORS[method],
             edgecolor="black",
             linewidth=0.8,
@@ -224,8 +243,16 @@ def save_latex_table(df: pd.DataFrame, out_path: str | Path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--summary", type=str, default="results_happy_4methods.csv")
-    ap.add_argument("--out_dir", type=str, default="fig/real/happy")
+    ap.add_argument(
+        "--summary",
+        type=str,
+        default="results/real/redshift/results_redshift_4methods.csv",
+    )
+    ap.add_argument(
+        "--out_dir",
+        type=str,
+        default="fig/real/redshift",
+    )
     ap.add_argument("--content_level", type=float, default=0.90)
     args = ap.parse_args()
 
@@ -234,19 +261,19 @@ def main():
 
     plot_happy_split_distribution(
         df,
-        out_dir / "fig_happy_split_distribution.png",
+        out_dir / "fig_redshift_split_distribution.png",
         content_level=args.content_level,
     )
 
     plot_happy_content_width_scatter(
         df,
-        out_dir / "fig_happy_content_width_scatter.png",
+        out_dir / "fig_redshift_content_width_scatter.png",
         content_level=args.content_level,
     )
 
     save_latex_table(
         df,
-        out_dir / "table_happy_summary.tex",
+        out_dir / "table_redshift_summary.tex",
     )
 
 
