@@ -158,7 +158,7 @@ def prepare_happy_split(
 # ============================================================
 # PAC-calibrated methods
 # ============================================================
-def run_hcti(
+def run_srti(
     dfA: pd.DataFrame, dfB: pd.DataFrame,
     x_col: str, y_col: str,
     content_level: float, pac_alpha: float,
@@ -177,11 +177,11 @@ def run_hcti(
     lower = np.maximum(itf(lower_z), 0.0)
     upper = itf(upper_z)
     out = evaluate_interval(y_te, lower, upper)
-    out.update(method="HCTI", lambda_=lam, qhat=qhat, q_level=q_level, bootstrap_mult=bootstrap_mult)
+    out.update(method="SR-TI", lambda_=lam, qhat=qhat, q_level=q_level, bootstrap_mult=bootstrap_mult)
     return out
 
 
-def run_hcti_asym(
+def run_asrti(
     dfA: pd.DataFrame, dfB: pd.DataFrame,
     x_col: str, y_col: str,
     content_level: float, pac_alpha: float,
@@ -210,7 +210,7 @@ def run_hcti_asym(
     lower = np.maximum(itf(lower_z), 0.0)
     upper = itf(upper_z)
     out = evaluate_interval(y_te, lower, upper)
-    out.update(method="HCTI-asym", lambda_=lam, qhat=qhat, q_level=q_level,
+    out.update(method="ASR-TI", lambda_=lam, qhat=qhat, q_level=q_level,
                a_minus=a_minus, a_plus=a_plus, bootstrap_mult=bootstrap_mult)
     return out
 
@@ -224,7 +224,7 @@ def run_cqr_ti(
 ):
     X_tr, X_cal, z_tr, z_cal, X_te, y_te = prepare_happy_split(dfA, dfB, x_col, y_col, n_sample, seed)
 
-    # Optional synthetic augmentation using the same mean/variance generator as HCTI.
+    # Optional synthetic augmentation using the same mean/variance generator as SR-TI.
     if bootstrap_mult and bootstrap_mult > 0:
         rng = np.random.default_rng(seed)
         mean_pipe, var_pipe, eps = fit_mean_var(X_tr, z_tr, seed, bootstrap_mult=0.0)
@@ -400,7 +400,7 @@ def run_many_seeds_4way(
 ) -> pd.DataFrame:
     rows = []
     for seed in seeds:
-        for fn in [run_parametric_ti, run_hcti, run_hcti_asym, run_cqr_ti]:
+        for fn in [run_parametric_ti, run_srti, run_asrti, run_cqr_ti]:
             r = fn(dfA, dfB, x_col, y_col, content_level, pac_alpha, n_sample, seed, bootstrap_mult)
             r.update(
             dataset="redshift",

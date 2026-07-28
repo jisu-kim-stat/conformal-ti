@@ -36,7 +36,7 @@ generate_data <- function(model_id, n, design = "uniform") {
 
   # Model 4: strongly skewed homoscedastic location model
   # Z = (Chi-square_2 - 2) / 2, mean 0 and variance 1, independent of X.
-  # This is the positive setting for HCTI-asym.
+  # This is the positive setting for ASR-TI.
   if (model_id == 4) {
     z <- (rchisq(n, df = 2) - 2) / 2
     y <- base + z

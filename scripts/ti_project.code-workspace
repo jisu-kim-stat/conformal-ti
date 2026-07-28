@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "ti_project",
+			"path": ".."
+		},
+		{
+			"name": "real_data_analysis",
+			"path": "../../Documents/Codex/2026-07-28/new-chat/outputs/real_data_analysis"
+		}
+	],
+	"settings": {}
+}

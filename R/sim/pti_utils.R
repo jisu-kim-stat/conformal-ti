@@ -1,37 +1,131 @@
-compute_norm <- function(vector) sqrt(sum(vector^2))
+# R/sim/pti_utils.R
+# ------------------------------------------------------------
+# Classical homoscedastic normal-regression TI used by Parametric-TI.
+#
+# This is deliberately separate from Guo and Young's Proposition 3.1 /
+# Equation (14), which is implemented in guo_young_ti.R by numerical
+# integration and root finding.
+# ------------------------------------------------------------
 
-compute_probability <- function(nu, t, P, k, norm_lx_h) {
-  tryCatch({
-    q_val <- qchisq(P, df = 1, ncp = pmin(1e4,t^2))
-    out <- numeric(length(q_val))
-    for (i in seq_along(q_val)) {
-      q <- q_val[i]
-      if (is.nan(q) || is.na(q)) { out[i] <- 0; next }
-      threshold <- (nu * q) / (k^2)
-      prob <- pchisq(threshold, df = nu, lower.tail = FALSE)
-      out[i] <- ifelse(is.nan(prob) || is.na(prob), 1e-6, prob)
-    }
-    return(out)
-  }, error = function(e) rep(0, length(t)))
-} #prop 3.1 의 Pr부분 계산하는 함수. t값을 받아 확률을 계산함 
+classical_parametric_design <- function(x) {
+  x <- as.numeric(x)
 
-integrand <- function(t, k, nu, P, norm_lx_h) {
-  exp_term <- exp(-t^2 / (2 * norm_lx_h^2))
-  prob_term <- compute_probability(nu, t, P, k, norm_lx_h)
-  if (log(exp_term) < -20) return(1e-3) #너무 작으면 -inf이 나오므로 이부분 방지
-  return(exp_term * prob_term)
+  if (any(!is.finite(x))) {
+    stop("x must be finite.", call. = FALSE)
+  }
+
+  # The simulation mean is base_mean(x) = sin(2*pi*x). Thus this is a
+  # correctly specified finite-dimensional normal regression model:
+  #   E(Y | X=x) = beta_0 + beta_1 sin(2*pi*x).
+  cbind(
+    "(Intercept)" = 1,
+    "sin(2*pi*x)" = sin(2 * pi * x)
+  )
 }
 
+
+find_parametric_k_factor <- function(nu,
+                                     norm_lx,
+                                     content,
+                                     alpha) {
+  stopifnot(
+    is.finite(nu), nu > 0,
+    all(is.finite(norm_lx)), all(norm_lx >= 0),
+    is.finite(content), content > 0, content < 1,
+    is.finite(alpha), alpha > 0, alpha < 1
+  )
+
+  q_content <- stats::qchisq(
+    content,
+    df = 1,
+    ncp = norm_lx^2
+  )
+  q_confidence <- stats::qchisq(alpha, df = nu)
+
+  if (!is.finite(q_confidence) || q_confidence <= 0) {
+    return(rep(NA_real_, length(norm_lx)))
+  }
+
+  sqrt(nu * q_content / q_confidence)
+}
+
+
+classical_parametric_ti <- function(x,
+                                    y,
+                                    x_new = x,
+                                    content = 0.90,
+                                    alpha = 0.05) {
+  x <- as.numeric(x)
+  y <- as.numeric(y)
+  x_new <- as.numeric(x_new)
+
+  if (length(x) != length(y)) {
+    stop("x and y must have the same length.", call. = FALSE)
+  }
+  if (any(!is.finite(y))) {
+    stop("y must be finite.", call. = FALSE)
+  }
+
+  design <- classical_parametric_design(x)
+  design_new <- classical_parametric_design(x_new)
+  n <- nrow(design)
+  p <- ncol(design)
+  nu <- n - p
+
+  if (nu <= 0) {
+    stop("The classical regression fit has no residual degrees of freedom.",
+         call. = FALSE)
+  }
+  if (qr(design)$rank < p) {
+    stop("The classical regression design matrix is rank deficient.",
+         call. = FALSE)
+  }
+
+  xtx_inverse <- solve(crossprod(design), diag(p))
+  beta_hat <- drop(xtx_inverse %*% crossprod(design, y))
+  fitted <- drop(design %*% beta_hat)
+  residual <- y - fitted
+  sigma2_hat <- sum(residual^2) / nu
+  sigma_hat <- sqrt(sigma2_hat)
+
+  predicted <- drop(design_new %*% beta_hat)
+  leverage <- rowSums((design_new %*% xtx_inverse) * design_new)
+  leverage <- pmax(leverage, 0)
+
+  k <- find_parametric_k_factor(
+    nu = nu,
+    norm_lx = sqrt(leverage),
+    content = content,
+    alpha = alpha
+  )
+
+  half_width <- k * sigma_hat
+  interval <- cbind(
+    lower = predicted - half_width,
+    upper = predicted + half_width
+  )
+
+  list(
+    interval = interval,
+    fitted = predicted,
+    k = k,
+    leverage = leverage,
+    beta_hat = beta_hat,
+    sigma2_hat = sigma2_hat,
+    sigma_hat = sigma_hat,
+    nu = nu,
+    content = content,
+    confidence = 1 - alpha
+  )
+}
+
+
+# Backward-compatible alias for older plotting scripts.
 find_k_factor <- function(nu, norm_lx_h, content, alpha) {
-  c2 <- norm_lx_h^2
-
-  # content quantile (HPD analogue)
-  q1 <- qchisq(content, df = 1, ncp = c2)
-
-  # confidence quantile
-  q2 <- qchisq(alpha, df = nu)
-
-  if (is.nan(q1) || is.nan(q2) || q2 == 0) return(NA_real_)
-
-  sqrt((nu * q1) / q2)
+  find_parametric_k_factor(
+    nu = nu,
+    norm_lx = norm_lx_h,
+    content = content,
+    alpha = alpha
+  )
 }

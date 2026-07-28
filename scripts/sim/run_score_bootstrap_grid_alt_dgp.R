@@ -43,7 +43,7 @@ source("R/packages.R")
 source("R/sim/base_mean.R")
 source("R/sim/data_generate_alt.R")
 source("R/sim/truth_content_alt.R")
-source("R/sim/fit_hcti.R")
+source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")
 
@@ -1142,7 +1142,7 @@ main <- function() {
     src("R/sim/base_mean.R")
     src("R/sim/data_generate_alt.R")
     src("R/sim/truth_content_alt.R")
-    src("R/sim/fit_hcti.R")
+    src("R/sim/fit_srti.R")
     src("R/sim/fit_cqr.R")
     src("R/sim/lambda_hoeffding.R")
 

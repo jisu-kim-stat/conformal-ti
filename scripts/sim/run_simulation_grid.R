@@ -13,10 +13,11 @@ source("R/sim/data_generate.R")
 source("R/sim/truth_content.R")
 
 # ---- methods ----
-source("R/sim/fit_hcti.R")
+source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")
 source("R/sim/pti_utils.R")
+source("R/sim/guo_young_ti.R")
 source("R/sim/one_replication.R")
 
 # ---- run setting ----
@@ -38,7 +39,9 @@ suppressPackageStartupMessages({
 n_cal_vec <- c(200, 500, 1000)  # later sample-size trend
 
 n_test <- 1000
-models <- 1:6
+# Parametric-TI and GY-TI are one-dimensional regression methods.
+# In data_generate.R, Models 1--5 are one-dimensional; Model 6 is not.
+models <- 1:5
 
 content_level <- 0.90
 alpha <- 0.05
@@ -65,10 +68,11 @@ clusterEvalQ(cl, {
   src("R/sim/data_generate.R")
   src("R/sim/truth_content.R")
 
-  src("R/sim/fit_hcti.R")
+  src("R/sim/fit_srti.R")
   src("R/sim/fit_cqr.R")
   src("R/sim/lambda_hoeffding.R")
   src("R/sim/pti_utils.R")
+  src("R/sim/guo_young_ti.R")
   src("R/sim/one_replication.R")
   src("R/sim/run_one_setting.R")
 
@@ -134,9 +138,9 @@ pointwise_df <- dplyr::bind_rows(all_pointwise)
 marginal_df  <- dplyr::bind_rows(all_marginal)
 px_good_df   <- dplyr::bind_rows(all_px_good)
 
-pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
+pointwise_path <- "results/sim/models/pointwise_success_5methods_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_5methods_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_5methods_design_uniform_normal.csv"
 
 readr::write_csv(pointwise_df, pointwise_path)
 readr::write_csv(marginal_df, marginal_path)

@@ -8,7 +8,7 @@ run_one_setting <- function(model_id,
                             content,
                             alpha,
                             epsilon_grid = c(0, 0.01, 0.02, 0.03, 0.05),
-                            design = "grid",
+                            design = "uniform",
                             n_bins = 50) {
 
   content_level <- content
@@ -139,13 +139,17 @@ run_one_setting <- function(model_id,
       .export = c(
         "model_id", "n_train", "n_cal", "n_test",
         "content_level", "alpha_conf", "design",
-        "one_replication_ours", "one_replication_pti",
+        "one_replication_ours", "one_replication_pti", "one_replication_gy",
         "base_mean", "generate_data", "content_function", "generate_eval_data",
         "fit_mean_model", "fit_var_model", "predict_mean", "predict_var",
         "fit_mean_model_auto", "fit_var_model_auto", "predict_mean_auto", "predict_var_auto",
         "fit_quantile_model", "predict_quantile", 
         "fit_quantile_model_auto", "predict_quantile_auto",
-        "find_lambda_hat", "find_score_cutoff", "find_k_factor", "find_asym_shape", "asym_residual_score"
+        "find_lambda_hat", "find_score_cutoff",
+        "classical_parametric_design", "classical_parametric_ti",
+        "find_parametric_k_factor", "find_asym_shape", "asym_residual_score",
+        "gy_fit_smoothing_spline", "gy_predict_smoother", "gy_pointwise_ti",
+        "gy_appendix_k", "gy_two_sided_k", "gy_equation14_probability"
       )
     ) %dorng% {
 
@@ -168,6 +172,19 @@ run_one_setting <- function(model_id,
         } else if (method == "Parametric-TI") {
 
           r <- one_replication_pti(
+            model_id = model_id,
+            n_train = n_train,
+            n_cal = n_cal,
+            n_test = n_test,
+            content = content_level,
+            alpha = alpha_conf,
+            seed = b,
+            design = design
+          )
+
+        } else if (method == "GY-TI") {
+
+          r <- one_replication_gy(
             model_id = model_id,
             n_train = n_train,
             n_cal = n_cal,
@@ -219,16 +236,45 @@ run_one_setting <- function(model_id,
     }
   }
 
-  long_srti <- run_method_long("SR-TI")
-  long_asrti <- run_method_long("ASR-TI")
-  long_cqr <- run_method_long("CQR-TI")
-  long_pti <- run_method_long("Parametric-TI")
+  format_method_time <- function(seconds) {
+    seconds <- max(0, as.numeric(seconds))
+    hours <- floor(seconds / 3600)
+    minutes <- floor((seconds %% 3600) / 60)
+    secs <- floor(seconds %% 60)
+    sprintf("%02d:%02d:%02d", hours, minutes, secs)
+  }
+
+  timed_run_method <- function(method) {
+    started_at <- Sys.time()
+    cat(
+      "  [METHOD START]", method,
+      "at", format(started_at, "%Y-%m-%d %H:%M:%S"),
+      "\n"
+    )
+    flush.console()
+
+    out <- run_method_long(method)
+
+    elapsed <- as.numeric(
+      difftime(Sys.time(), started_at, units = "secs")
+    )
+    cat(
+      "  [METHOD DONE] ", method,
+      " | elapsed ", format_method_time(elapsed),
+      "\n",
+      sep = ""
+    )
+    flush.console()
+
+    out
+  }
 
   long_list <- list(
-    "SR-TI" = long_srti,
-    "ASR-TI" = long_asrti,
-    "CQR-TI" = long_cqr,
-    "Parametric-TI" = long_pti
+    "SR-TI" = timed_run_method("SR-TI"),
+    "ASR-TI" = timed_run_method("ASR-TI"),
+    "CQR-TI" = timed_run_method("CQR-TI"),
+    "Parametric-TI" = timed_run_method("Parametric-TI"),
+    "GY-TI" = timed_run_method("GY-TI")
   )
 
   pointwise_df <- dplyr::bind_rows(

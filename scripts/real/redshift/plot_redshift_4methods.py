@@ -8,20 +8,25 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-METHODS = ["HCTI", "HCTI-asym", "CQR-TI", "Parametric TI"]
+METHODS = ["SR-TI", "ASR-TI", "CQR-TI", "Parametric TI"]
 
 METHOD_COLORS = {
-    "HCTI": "#D55E00",
-    "HCTI-asym": "#CC79A7",
+    "SR-TI": "#D55E00",
+    "ASR-TI": "#CC79A7",
     "CQR-TI": "#0072B2",
     "Parametric TI": "#555555",
 }
 
 METHOD_MARKERS = {
-    "HCTI": "o",
-    "HCTI-asym": "o",
+    "SR-TI": "o",
+    "ASR-TI": "o",
     "CQR-TI": "^",
     "Parametric TI": "s",
+}
+
+LEGACY_METHOD_NAMES = {
+    "HCTI": "SR-TI",
+    "HCTI-asym": "ASR-TI",
 }
 
 
@@ -33,6 +38,7 @@ def load_summary(path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing columns in summary csv: {sorted(missing)}")
 
+    df["method"] = df["method"].replace(LEGACY_METHOD_NAMES)
     df = df[df["method"].isin(METHODS)].copy()
     df["method"] = pd.Categorical(df["method"], categories=METHODS, ordered=True)
 

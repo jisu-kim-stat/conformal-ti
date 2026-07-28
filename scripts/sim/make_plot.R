@@ -9,9 +9,9 @@ suppressPackageStartupMessages({
 # ============================================================
 # Paths
 # ============================================================
-pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_ncqr_pti_alt_dgp_design_uniform_normal.csv"
+pointwise_path <- "results/sim/models/pointwise_success_5methods_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_5methods_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_5methods_design_uniform_normal.csv"
 out_dir <- "results/sim/models/plots"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -66,22 +66,22 @@ theme_pac_paper <- function(base_size = 12) {
     )
 }
 
-method_levels <- c("HCTI", "HCTI-asym", "CQR-TI", "NCQR-TI", "Parametric-TI")
+method_levels <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
 
 method_cols <- c(
-  "HCTI" = "#D55E00",
-  "HCTI-asym" = "#CC79A7",
+  "SR-TI" = "#D55E00",
+  "ASR-TI" = "#CC79A7",
   "CQR-TI" = "#0072B2",
-  "NCQR-TI" = "#009E73",
-  "Parametric-TI" = "#555555"
+  "Parametric-TI" = "#555555",
+  "GY-TI" = "#009E73"
 )
 
 method_shapes <- c(
-  "HCTI" = 16,
-  "HCTI-asym" = 18,
+  "SR-TI" = 16,
+  "ASR-TI" = 18,
   "CQR-TI" = 17,
-  "NCQR-TI" = 3,
-  "Parametric-TI" = 15
+  "Parametric-TI" = 15,
+  "GY-TI" = 3
 )
 
 # ============================================================

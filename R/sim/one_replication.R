@@ -1,9 +1,11 @@
 # R/sim/one_replication.R
 # --------------------------------------------------
 # One replication for:
-#   - HCTI
+#   - SR-TI
+#   - ASR-TI
 #   - CQR-TI
 #   - Parametric-TI
+#   - GY-TI
 #
 # Output:
 #   list(x, content, width, lambda_na)
@@ -11,7 +13,16 @@
 
 
 # --------------------------------------------------
-# Parametric TI
+# Parametric-TI
+#
+# Classical homoscedastic normal-regression tolerance interval:
+#   E(Y | X=x) = beta_0 + beta_1 sin(2*pi*x),
+#   epsilon ~ N(0, sigma^2).
+#
+# It uses residual df n-p, regression leverage h(x), and the closed-form
+# normal-theory tolerance factor in pti_utils.R. It is not a smoothing
+# spline, a heteroscedastic model, or the Guo-Young Equation (14) method.
+#
 # This implementation is for one-dimensional x only.
 # --------------------------------------------------
 
@@ -22,7 +33,7 @@ one_replication_pti <- function(model_id,
                                 content,
                                 alpha,
                                 seed = NULL,
-                                design = 'grid') {
+                                design = "uniform") {
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -45,64 +56,16 @@ one_replication_pti <- function(model_id,
 
   x_test <- data_test$x
 
-  # mean / variance fit using all fitting data
-  fit_mean <- fit_mean_model(x, y)
-  fit_var  <- fit_var_model(x, y, fit_mean)
-
-  var_hat <- predict_var(fit_var, x)
-
-  # standardization
-  y_std <- y / sqrt(pmax(var_hat, 1e-8))
-  fit_std <- smooth.spline(x, y_std, cv = FALSE)
-  mu_std <- as.numeric(predict(fit_std, x)$y)
-
-  # smoothing matrix S
-  B <- splines::bs(x, df = fit_std$df)
-  D <- diff(diag(ncol(B)), differences = 2)
-
-  S_inv <- MASS::ginv(
-    t(B) %*% B + fit_std$lambda * t(D) %*% D
+  classical_fit <- classical_parametric_ti(
+    x = x,
+    y = y,
+    x_new = x_test,
+    content = content,
+    alpha = alpha
   )
 
-  S <- B %*% S_inv %*% t(B)
-  R <- diag(n_fit) - S
-
-  resid_std <- y_std - mu_std
-
-  A <- t(R) %*% R
-
-  est_var <- as.numeric(
-    t(resid_std) %*% resid_std / sum(diag(A))
-  )
-
-  nu <- (sum(diag(A))^2) / sum(diag(A %*% A))
-
-  # For test points, need smoother row l(x0), not just rows of S on training points.
-  # Approximate by constructing basis at test points.
-  B_test <- predict(
-    splines::bs(x, df = fit_std$df),
-    newx = x_test
-  )
-
-  L_test <- B_test %*% S_inv %*% t(B)
-
-  norm_lx_test <- apply(L_test, 1, function(v) sqrt(sum(v^2)))
-
-  k_vec <- sapply(norm_lx_test, function(nlh) {
-    find_k_factor(
-      nu         = nu,
-      norm_lx_h  = nlh,
-      content    = content,
-      alpha      = alpha
-    )
-  })
-
-  # Predict standardized mean and variance on test points
-  mu_std_test <- as.numeric(predict(fit_std, x_test)$y)
-  var_test <- predict_var(fit_var, x_test)
-
-  upper <- (mu_std_test + sqrt(est_var) * k_vec) * sqrt(pmax(var_test, 1e-8))
-  lower <- (mu_std_test - sqrt(est_var) * k_vec) * sqrt(pmax(var_test, 1e-8))
+  lower <- classical_fit$interval[, "lower"]
+  upper <- classical_fit$interval[, "upper"]
 
   content_vec <- content_function(model_id, lower, upper, x_test)
   width_vec   <- upper - lower
@@ -117,8 +80,68 @@ one_replication_pti <- function(model_id,
 
 
 # --------------------------------------------------
+# Guo-Young (2024) pointwise TI
+#
+# Homoscedastic nonparametric regression TI:
+#   - Equation (11) for sigma_hat and nu
+#   - Appendix Lemma A.1(3) for the fast approximate k(||ell_x||)
+#
+# No variance standardization or PAC calibration is applied.
+# --------------------------------------------------
+
+one_replication_gy <- function(model_id,
+                               n_train,
+                               n_cal,
+                               n_test = 1000,
+                               content,
+                               alpha,
+                               seed = NULL,
+                               design = "uniform") {
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
+
+  stopifnot(
+    model_id %in% 1:6,
+    n_train >= 2,
+    n_cal >= 2,
+    n_test >= 1,
+    content > 0, content < 1,
+    alpha > 0, alpha < 1
+  )
+
+  n_fit <- n_train + n_cal
+  data_fit <- generate_data(model_id, n_fit, design = design)
+  data_test <- generate_eval_data(model_id, n_test, design = design)
+
+  x <- data_fit$x
+  y <- data_fit$y
+  x_test <- data_test$x
+
+  gy_fit <- gy_pointwise_ti(
+    x = x,
+    y = y,
+    x_new = x_test,
+    content = content,
+    gamma = 1 - alpha,
+    k_method = "appendix"
+  )
+
+  lower <- gy_fit$interval[, "lower"]
+  upper <- gy_fit$interval[, "upper"]
+
+  list(
+    x = x_test,
+    content = content_function(model_id, lower, upper, x_test),
+    width = upper - lower,
+    lambda_na = rep(0L, n_test)
+  )
+}
+
+
+# --------------------------------------------------
 # Our methods:
-#   HCTI, HCTI-asym, CQR-TI
+#   SR-TI, ASR-TI, CQR-TI
 # --------------------------------------------------
 one_replication_ours <- function(method,
                                  model_id,
@@ -128,9 +151,12 @@ one_replication_ours <- function(method,
                                  content,
                                  alpha,
                                  seed = NULL,
-                                 design = 'grid') {
+                                 design = "uniform") {
 
-  method <- match.arg(method, c("HCTI", "HCTI-asym", "CQR-TI", "NCQR-TI"))
+  method <- match.arg(
+    method,
+    c("SR-TI", "ASR-TI", "CQR-TI", "NCQR-TI")
+  )
 
   if (!is.null(seed)) set.seed(seed)
 
@@ -178,10 +204,10 @@ one_replication_ours <- function(method,
   lambda_na_vec <- rep(0L, n_test)
 
   # --------------------------------------------------
-  # HCTI
+  # SR-TI
   # --------------------------------------------------
 
-  if (method == "HCTI") {
+  if (method == "SR-TI") {
 
     # fit nuisance models on training data
     fit_mean <- fit_mean_model_auto(train_x, train_y, model_id)
@@ -229,10 +255,10 @@ one_replication_ours <- function(method,
   }
 
   # --------------------------------------------------
-  # HCTI-asym
+  # ASR-TI
   # --------------------------------------------------
 
-  if (method == "HCTI-asym") {
+  if (method == "ASR-TI") {
 
     tau_asym <- mis / 2
 

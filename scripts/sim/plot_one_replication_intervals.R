@@ -2,11 +2,12 @@ source("R/packages.R")
 source("R/sim/base_mean.R")
 source("R/sim/data_generate.R")
 source("R/sim/truth_content.R")
-source("R/sim/fit_hcti.R")
+source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
-source("R/sim/one_replication.R")
 source("R/sim/lambda_hoeffding.R")
 source("R/sim/pti_utils.R")
+source("R/sim/guo_young_ti.R")
+source("R/sim/one_replication.R")
 
 library(dplyr)
 library(ggplot2)
@@ -89,47 +90,47 @@ for (design in design_vec) {
     true_mean <- base_mean(x_test)
 
     ############################################################
-    # HCTI
+    # SR-TI
     ############################################################
 
-    fit_mean_hcti <- fit_mean_model_auto(x_train, y_train, model_id)
-    fit_var_hcti  <- fit_var_model_auto(x_train, y_train, fit_mean_hcti, model_id)
+    fit_mean_srti <- fit_mean_model_auto(x_train, y_train, model_id)
+    fit_var_srti  <- fit_var_model_auto(x_train, y_train, fit_mean_srti, model_id)
 
-    pred_cal_hcti <- predict_mean_auto(fit_mean_hcti, x_cal, model_id)
-    var_cal_hcti  <- predict_var_auto(fit_var_hcti, x_cal, model_id)
+    pred_cal_srti <- predict_mean_auto(fit_mean_srti, x_cal, model_id)
+    var_cal_srti  <- predict_var_auto(fit_var_srti, x_cal, model_id)
 
-    lambda_hcti <- find_lambda_hat(
+    lambda_srti <- find_lambda_hat(
       mis = 1 - content,
       alpha = alpha,
       y = y_cal,
-      pred = pred_cal_hcti,
-      variance = var_cal_hcti
+      pred = pred_cal_srti,
+      variance = var_cal_srti
     )
 
-    pred_test_hcti <- predict_mean_auto(fit_mean_hcti, x_test, model_id)
-    var_test_hcti  <- predict_var_auto(fit_var_hcti, x_test, model_id)
+    pred_test_srti <- predict_mean_auto(fit_mean_srti, x_test, model_id)
+    var_test_srti  <- predict_var_auto(fit_var_srti, x_test, model_id)
 
-    lower_hcti <- pred_test_hcti - lambda_hcti * sqrt(pmax(var_test_hcti, 1e-8))
-    upper_hcti <- pred_test_hcti + lambda_hcti * sqrt(pmax(var_test_hcti, 1e-8))
+    lower_srti <- pred_test_srti - lambda_srti * sqrt(pmax(var_test_srti, 1e-8))
+    upper_srti <- pred_test_srti + lambda_srti * sqrt(pmax(var_test_srti, 1e-8))
 
-    df_hcti <- tibble(
+    df_srti <- tibble(
       x = x_test,
       y = y_test,
       true_mean = true_mean,
-      lower = lower_hcti,
-      upper = upper_hcti,
-      center = pred_test_hcti,
-      Method = "HCTI"
+      lower = lower_srti,
+      upper = upper_srti,
+      center = pred_test_srti,
+      Method = "SR-TI"
     )
 
     ############################################################
-    # HCTI-asym
+    # ASR-TI
     ############################################################
 
     tau_asym <- (1 - content) / 2
 
-    mu_train_asym  <- predict_mean_auto(fit_mean_hcti, x_train, model_id)
-    var_train_asym <- predict_var_auto(fit_var_hcti, x_train, model_id)
+    mu_train_asym  <- predict_mean_auto(fit_mean_srti, x_train, model_id)
+    var_train_asym <- predict_var_auto(fit_var_srti, x_train, model_id)
 
     z_train_asym <- (y_train - mu_train_asym) / sqrt(pmax(var_train_asym, 1e-8))
 
@@ -142,7 +143,7 @@ for (design in design_vec) {
     a_minus <- shape_asym["a_minus"]
     a_plus  <- shape_asym["a_plus"]
 
-    z_cal_asym <- (y_cal - pred_cal_hcti) / sqrt(pmax(var_cal_hcti, 1e-8))
+    z_cal_asym <- (y_cal - pred_cal_srti) / sqrt(pmax(var_cal_srti, 1e-8))
 
     score_asym <- asym_residual_score(
       z = z_cal_asym,
@@ -156,17 +157,17 @@ for (design in design_vec) {
       score = score_asym
     )
 
-    lower_asym <- pred_test_hcti - q_asym * a_minus * sqrt(pmax(var_test_hcti, 1e-8))
-    upper_asym <- pred_test_hcti + q_asym * a_plus  * sqrt(pmax(var_test_hcti, 1e-8))
+    lower_asym <- pred_test_srti - q_asym * a_minus * sqrt(pmax(var_test_srti, 1e-8))
+    upper_asym <- pred_test_srti + q_asym * a_plus  * sqrt(pmax(var_test_srti, 1e-8))
 
-    df_hcti_asym <- tibble(
+    df_asrti <- tibble(
       x = x_test,
       y = y_test,
       true_mean = true_mean,
       lower = lower_asym,
       upper = upper_asym,
       center = (lower_asym + upper_asym) / 2,
-      Method = "HCTI-asym"
+      Method = "ASR-TI"
     )
 
     ############################################################
@@ -215,81 +216,59 @@ for (design in design_vec) {
     x_full <- full_data$x
     y_full <- full_data$y
 
-    n_fit <- length(y_full)
-
-    fit_mean_pti <- fit_mean_model(x_full, y_full)
-    fit_var_pti  <- fit_var_model(x_full, y_full, fit_mean_pti)
-
-    var_hat_full <- predict_var(fit_var_pti, x_full)
-
-    y_std <- y_full / sqrt(pmax(var_hat_full, 1e-8))
-    fit_std <- smooth.spline(x_full, y_std, cv = FALSE)
-    mu_std <- as.numeric(predict(fit_std, x_full)$y)
-
-    B_basis <- splines::bs(x_full, df = fit_std$df)
-    D <- diff(diag(ncol(B_basis)), differences = 2)
-
-    S_inv <- MASS::ginv(
-      t(B_basis) %*% B_basis + fit_std$lambda * t(D) %*% D
+    fit_pti <- classical_parametric_ti(
+      x = x_full,
+      y = y_full,
+      x_new = x_test,
+      content = content,
+      alpha = alpha
     )
-
-    S <- B_basis %*% S_inv %*% t(B_basis)
-    R <- diag(n_fit) - S
-
-    resid_std <- y_std - mu_std
-    A <- t(R) %*% R
-
-    est_var <- as.numeric(
-      t(resid_std) %*% resid_std / sum(diag(A))
-    )
-
-    nu <- (sum(diag(A))^2) / sum(diag(A %*% A))
-
-    B_test <- predict(
-      splines::bs(x_full, df = fit_std$df),
-      newx = x_test
-    )
-
-    L_test <- B_test %*% S_inv %*% t(B_basis)
-
-    norm_lx_test <- apply(L_test, 1, function(v) sqrt(sum(v^2)))
-
-    k_vec <- sapply(norm_lx_test, function(nlh) {
-      find_k_factor(
-        nu        = nu,
-        norm_lx_h = nlh,
-        content   = content,
-        alpha     = alpha
-      )
-    })
-
-    mu_std_test <- as.numeric(predict(fit_std, x_test)$y)
-    var_test_pti <- predict_var(fit_var_pti, x_test)
-
-    upper_pti <- (mu_std_test + sqrt(est_var) * k_vec) * sqrt(pmax(var_test_pti, 1e-8))
-    lower_pti <- (mu_std_test - sqrt(est_var) * k_vec) * sqrt(pmax(var_test_pti, 1e-8))
 
     df_pti <- tibble(
       x = x_test,
       y = y_test,
       true_mean = true_mean,
-      lower = lower_pti,
-      upper = upper_pti,
-      center = (lower_pti + upper_pti) / 2,
+      lower = fit_pti$interval[, "lower"],
+      upper = fit_pti$interval[, "upper"],
+      center = fit_pti$fitted,
       Method = "Parametric-TI"
     )
 
-    
+    ############################################################
+    # Guo-Young (2024) GY-TI
+    ############################################################
+
+    fit_gy <- gy_pointwise_ti(
+      x = x_full,
+      y = y_full,
+      x_new = x_test,
+      content = content,
+      gamma = 1 - alpha,
+      k_method = "appendix"
+    )
+
+    df_gy <- tibble(
+      x = x_test,
+      y = y_test,
+      true_mean = true_mean,
+      lower = fit_gy$interval[, "lower"],
+      upper = fit_gy$interval[, "upper"],
+      center = fit_gy$fitted,
+      Method = "GY-TI"
+    )
 
     ############################################################
     # Combine and plot
     ############################################################
 
-    plot_df <- bind_rows(df_hcti, df_hcti_asym, df_cqr, df_pti) %>%
+    plot_df <- bind_rows(df_srti, df_asrti, df_cqr, df_pti, df_gy) %>%
     mutate(
       Method = factor(
         Method,
-        levels = c("HCTI", "HCTI-asym", "CQR-TI", "Parametric-TI")
+        levels = c(
+          "SR-TI", "ASR-TI", "CQR-TI",
+          "Parametric-TI", "GY-TI"
+        )
       )
     )
 
@@ -322,7 +301,7 @@ for (design in design_vec) {
       filename = plot_file,
       plot = p,
       width = 8,
-      height = 10,
+      height = 12,
       dpi = 300
     )
 

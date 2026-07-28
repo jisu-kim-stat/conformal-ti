@@ -47,7 +47,8 @@ method_order <- c(
   "SR-TI",
   "ASR-TI",
   "CQR-TI",
-  "Parametric-TI"
+  "Parametric-TI",
+  "GY-TI"
 )
 
 table_long <- dat %>%
@@ -133,7 +134,7 @@ table_wide <- table_long %>%
 table_print <- table_wide %>%
   select(-design)
 
-# 각 design당 2 models × 4 methods = 8 rows
+# Each design has 2 models x 5 methods = 10 rows.
 n_normal <- sum(table_wide$design == "normal")
 n_uniform <- sum(table_wide$design == "uniform")
 
@@ -167,7 +168,7 @@ latex_table <- table_print %>%
     "$1-\\alpha=0.95$. Results are based on ",
     "$M=1000$ Monte Carlo replications."
     ),
-    label = "tab:marginal-pac-representative"
+    label = "marginal-pac-representative"
   ) %>%
   pack_rows(
     index = c(

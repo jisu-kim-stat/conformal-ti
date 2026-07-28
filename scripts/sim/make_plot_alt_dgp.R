@@ -9,9 +9,9 @@ suppressPackageStartupMessages({
 # ============================================================
 # Paths
 # ============================================================
-pointwise_path <- "/Users/jisukim/ti_project/results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-marginal_path  <- "/Users/jisukim/ti_project/results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-px_good_path   <- "/Users/jisukim/ti_project/results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+pointwise_path <- "results/sim/models/pointwise_success_5methods_alt_dgp_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_5methods_alt_dgp_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_5methods_alt_dgp_design_uniform_normal.csv"
 
 out_dir <- "results/sim/models/plots_alt_dgp"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -76,27 +76,30 @@ theme_pac_paper <- function(base_size = 10) {
     )
 }
 
-method_levels <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI")
+method_levels <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
 
 method_cols <- c(
   "SR-TI" = "#D55E00",
   "ASR-TI" = "#CC79A7",
   "CQR-TI" = "#0072B2",
-  "Parametric-TI" = "#555555"
+  "Parametric-TI" = "#555555",
+  "GY-TI" = "#009E73"
 )
 
 method_shapes <- c(
   "SR-TI" = 16,
   "ASR-TI" = 18,
   "CQR-TI" = 17,
-  "Parametric-TI" = 15
+  "Parametric-TI" = 15,
+  "GY-TI" = 3
 )
 
 method_linetypes <- c(
   "SR-TI" = "solid",
   "ASR-TI" = "solid",
   "CQR-TI" = "solid",
-  "Parametric-TI" = "solid"
+  "Parametric-TI" = "solid",
+  "GY-TI" = "solid"
 )
 
 # ============================================================
@@ -629,7 +632,7 @@ for (des in design_vec) {
 
     # ==========================================================
     # 7b. Score-based intervals over the full covariate range
-    # Parametric extrapolation does not compress the other curves
+    # Model-based interval widths do not compress the score-based curves
     # ==========================================================
 
     score_width_df <- pointwise_plot_df %>%
@@ -668,7 +671,7 @@ for (des in design_vec) {
         ),
         subtitle = paste0(
           des_eval,
-          " Parametric-TI is displayed separately because of tail extrapolation."
+          " Model-based TIs are displayed separately because of tail extrapolation."
         ),
         x = "Covariate x",
         y = "Mean interval width"
@@ -687,26 +690,24 @@ for (des in design_vec) {
     )
 
     # ==========================================================
-    # 7c. Parametric-TI over the full covariate range
+    # 7c. Model-based TIs over the full covariate range
     # Pseudo-log scale preserves small widths and tail explosion
     # ==========================================================
 
-    parametric_width_df <- pointwise_plot_df %>%
-      filter(Method == "Parametric-TI") %>%
+    model_based_width_df <- pointwise_plot_df %>%
+      filter(Method %in% c("Parametric-TI", "GY-TI")) %>%
       droplevels()
 
-    p_width_parametric_full <- ggplot(
-      parametric_width_df,
+    p_width_model_based_full <- ggplot(
+      model_based_width_df,
       aes(
         x = x,
         y = mean_width,
+        color = Method,
         group = Method
       )
     ) +
-      geom_line(
-        color = method_cols["Parametric-TI"],
-        linewidth = 0.8
-      ) +
+      geom_line(linewidth = 0.8) +
       facet_grid(
         rows = vars(model_lab),
         cols = vars(ncal_lab),
@@ -714,12 +715,16 @@ for (des in design_vec) {
         scales = "free_y",
         drop = FALSE
       ) +
+      scale_color_manual(
+        values = method_cols[c("Parametric-TI", "GY-TI")],
+        drop = FALSE
+      ) +
       scale_y_continuous(
         trans = scales::pseudo_log_trans(sigma = 1)
       ) +
       labs(
         title = paste0(
-          "Conditional mean width of Parametric-TI under ",
+          "Conditional mean width of model-based TIs under ",
           des_title
         ),
         subtitle = paste0(
@@ -729,17 +734,14 @@ for (des in design_vec) {
         x = "Covariate x",
         y = "Mean interval width (pseudo-log scale)"
       ) +
-      theme_pac_paper(base_size = 10.5) +
-      theme(
-        legend.position = "none"
-      )
+      theme_pac_paper(base_size = 10.5)
 
     ggsave(
       filename = file.path(
         design_out_dir,
-        "app_conditional_width_parametric_full_normal.png"
+        "app_conditional_width_model_based_full_normal.png"
       ),
-      plot = p_width_parametric_full,
+      plot = p_width_model_based_full,
       width = 14,
       height = 10.5,
       dpi = 300

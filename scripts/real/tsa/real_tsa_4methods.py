@@ -183,7 +183,7 @@ def prepare_tsa_arrays(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd
 # ============================================================
 # PAC-calibrated methods
 # ============================================================
-def run_hcti(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFrame,
+def run_srti(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFrame,
              content_level: float, pac_alpha: float, seed: int, tf_fn, itf_fn):
     X_tr, X_cal, X_te, _, _, y_te, z_tr, z_cal = prepare_tsa_arrays(df_train, df_cal, df_test, tf_fn)
     mean_pipe, var_pipe, eps = fit_mean_var(X_tr, z_tr, seed)
@@ -194,11 +194,11 @@ def run_hcti(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFrame
     lower = np.maximum(itf_fn(mu_te - qhat * sd_te), 0.0)
     upper = itf_fn(mu_te + qhat * sd_te)
     out = evaluate_interval(y_te, lower, upper)
-    out.update(method="HCTI", lambda_=lam, qhat=qhat, q_level=q_level, lower=lower, upper=upper)
+    out.update(method="SR-TI", lambda_=lam, qhat=qhat, q_level=q_level, lower=lower, upper=upper)
     return out
 
 
-def run_hcti_asym(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFrame,
+def run_asrti(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.DataFrame,
                   content_level: float, pac_alpha: float, seed: int, tf_fn, itf_fn):
     X_tr, X_cal, X_te, _, _, y_te, z_tr, z_cal = prepare_tsa_arrays(df_train, df_cal, df_test, tf_fn)
     mean_pipe, var_pipe, eps = fit_mean_var(X_tr, z_tr, seed)
@@ -218,7 +218,7 @@ def run_hcti_asym(df_train: pd.DataFrame, df_cal: pd.DataFrame, df_test: pd.Data
     lower = np.maximum(itf_fn(mu_te - qhat * a_minus * sd_te), 0.0)
     upper = itf_fn(mu_te + qhat * a_plus * sd_te)
     out = evaluate_interval(y_te, lower, upper)
-    out.update(method="HCTI-asym", lambda_=lam, qhat=qhat, q_level=q_level,
+    out.update(method="ASR-TI", lambda_=lam, qhat=qhat, q_level=q_level,
                a_minus=a_minus, a_plus=a_plus, lower=lower, upper=upper)
     return out
 
@@ -371,7 +371,7 @@ def run_many_seeds(
             df_tr, df_cal, df_te = split_time(df, a_end=a_end, b_start=b_start,
                                               train_frac_A=train_frac_A, seed=seed)
 
-        for fn in [run_parametric_ti, run_hcti, run_hcti_asym, run_cqr_ti]:
+        for fn in [run_parametric_ti, run_srti, run_asrti, run_cqr_ti]:
             r = fn(df_tr, df_cal, df_te, content_level, pac_alpha, seed, tf_fn, itf_fn)
             lower = np.asarray(r.pop("lower"), dtype=float)
             upper = np.asarray(r.pop("upper"), dtype=float)

@@ -8,16 +8,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-METHODS = ["Parametric TI", "HCTI", "HCTI-asym", "CQR-TI"]
+METHODS = ["Parametric TI", "SR-TI", "ASR-TI", "CQR-TI"]
 
 METHOD_LABELS = {
     "Parametric TI": "Parametric TI",
-    "HCTI": "HCTI",
-    "HCTI-asym": "HCTI-asym",
+    "SR-TI": "SR-TI",
+    "ASR-TI": "ASR-TI",
     "CQR-TI": "CQR-TI",
 }
 
 METHOD_ORDER = {m: i for i, m in enumerate(METHODS)}
+
+LEGACY_METHOD_NAMES = {
+    "HCTI": "SR-TI",
+    "HCTI-asym": "ASR-TI",
+}
 
 
 def load_summary(path: str | Path) -> pd.DataFrame:
@@ -27,6 +32,7 @@ def load_summary(path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing columns in summary csv: {sorted(missing)}")
 
+    df["method"] = df["method"].replace(LEGACY_METHOD_NAMES)
     df = df[df["method"].isin(METHODS)].copy()
     df["method"] = pd.Categorical(df["method"], categories=METHODS, ordered=True)
 
@@ -46,6 +52,7 @@ def load_intervals(path: str | Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing columns in intervals csv: {sorted(missing)}")
 
+    df["method"] = df["method"].replace(LEGACY_METHOD_NAMES)
     df = df[df["method"].isin(METHODS)].copy()
     df["method"] = pd.Categorical(df["method"], categories=METHODS, ordered=True)
     df["seed"] = df["seed"].astype(int)
@@ -216,10 +223,10 @@ def plot_pointwise_layer(
 
 def choose_representative_seed(summary: pd.DataFrame) -> int:
     """
-    Pick a seed whose HCTI content is closest to the median HCTI content.
+    Pick a seed whose SR-TI content is closest to the median SR-TI content.
     This avoids cherry-picking an unusually good/bad split.
     """
-    d = summary[summary["method"] == "HCTI"].copy()
+    d = summary[summary["method"] == "SR-TI"].copy()
     if d.empty:
         return int(summary["seed"].iloc[0])
     med = d["content"].median()

@@ -4,12 +4,16 @@ This repository contains simulation and real-data code for regression tolerance 
 
 ## Methods
 
-The repository compares four methods:
+The repository compares five methods:
 
-- **Parametric TI**: spline-based model benchmark
-- **HCTI**: symmetric standardized residual score
-- **HCTI-asym**: asymmetric standardized residual score
+- **SR-TI**: symmetric standardized residual score
+- **ASR-TI**: asymmetric standardized residual score
 - **CQR-TI**: quantile-regression score
+- **Parametric-TI**: classical homoscedastic normal-regression TI with
+  mean model \(\beta_0+\beta_1\sin(2\pi x)\)
+- **GY-TI**: Guo and Young (2024) homoscedastic pointwise TI, using
+  Equation (11) and the fast k-factor approximation in Appendix
+  Lemma A.1(3)
 
 The PAC-calibrated methods use the empirical \((C+\lambda_\alpha)\)-quantile of calibration scores, where
 
@@ -69,6 +73,12 @@ Rscript scripts/sim/run_simulation_grid_alt_dgp.R
 Rscript scripts/sim/make_plot_alt_dgp.R
 ```
 
+Quick validation:
+
+```text
+Rscript tests/test_sim_ti_methods.R
+```
+
 ## Real Data
 The repository includes two real-data applications:
 1. Reashift Data
@@ -105,7 +115,8 @@ python scripts/real/tsa/plot_tsa_4methods.py \
 
 ## Notes
 - PAC-calibrated methods use split data.
-- Parametric TI is a model-based benchmark.
+- Parametric-TI and GY-TI are distinct model-based benchmarks.
+- GY-TI assumes homoscedastic errors and is not PAC calibrated.
 - Real-data results report empirical content, not true conditional coverage.
 - fig/, results/, *.csv, and *.png are generated artifacts.
 

@@ -1,4 +1,6 @@
-# for one-dimensional data
+# Nuisance mean/variance models shared by SR-TI and ASR-TI.
+# The historical filename is retained so existing source() calls keep working.
+# One-dimensional implementation.
 fit_mean_model <- function(x, y) {
   x <- as.numeric(x)
   y <- as.numeric(y)

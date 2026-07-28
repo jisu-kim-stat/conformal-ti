@@ -28,7 +28,7 @@ find_score_cutoff <- function(mis, alpha, score) {
   score_sorted[idx]
 }
 
-# HCTI
+# SR-TI
 find_lambda_hat <- function(mis, alpha, y, pred, variance) {
 
   stopifnot(
@@ -70,4 +70,3 @@ asym_residual_score <- function(z, a_minus, a_plus) {
      z / a_plus
   )
 }
-

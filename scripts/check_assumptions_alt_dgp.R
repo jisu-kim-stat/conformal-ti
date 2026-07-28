@@ -29,7 +29,7 @@ source("R/sim/base_mean.R")
 source("R/sim/data_generate_alt.R")
 source("R/sim/truth_content_alt.R")
 
-source("R/sim/fit_hcti.R")
+source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")
 source("R/sim/pti_utils.R")
@@ -51,7 +51,7 @@ set.seed(20260720)
 out_dir <- "results/sim/models/assumption_diagnostics_alt_dgp"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-models <- 1:6
+models <- 1:5
 design_vec <- c("uniform", "normal")
 
 n_train_vec <- c(200, 500, 1000)
@@ -60,7 +60,7 @@ content <- 0.90
 tau_asym <- (1 - content) / 2
 
 # Monte Carlo settings for diagnostic approximation
-M_rep <- 50
+M_rep <- 200
 n_eval <- 401
 n_marginal <- 5000
 n_conditional <- 800
@@ -202,14 +202,14 @@ ks_distance <- function(x, y) {
 # Score functions
 # ============================================================
 
-compute_hcti_score <- function(x, y, fit_mean, fit_var, model_id) {
+compute_srti_score <- function(x, y, fit_mean, fit_var, model_id) {
   mu_hat <- predict_mean_auto(fit_mean, x, model_id)
   var_hat <- predict_var_auto(fit_var, x, model_id)
 
   abs(y - mu_hat) / sqrt(pmax(var_hat, 1e-8))
 }
 
-compute_hcti_asym_score <- function(x, y, fit_mean, fit_var, model_id, a_minus, a_plus) {
+compute_asrti_score <- function(x, y, fit_mean, fit_var, model_id, a_minus, a_plus) {
   mu_hat <- predict_mean_auto(fit_mean, x, model_id)
   var_hat <- predict_var_auto(fit_var, x, model_id)
 
@@ -248,7 +248,7 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
   y_train <- train$y
 
   # ---------------------------
-  # Fit HCTI nuisance functions
+  # Fit SR-TI / ASR-TI nuisance functions
   # ---------------------------
 
   fit_mean <- fit_mean_model_auto(x_train, y_train, model_id)
@@ -318,7 +318,7 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
   x_marg <- marginal_data$x
   y_marg <- marginal_data$y
 
-  score_marg_hcti <- compute_hcti_score(
+  score_marg_srti <- compute_srti_score(
     x = x_marg,
     y = y_marg,
     fit_mean = fit_mean,
@@ -326,7 +326,7 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
     model_id = model_id
   )
 
-  score_marg_asym <- compute_hcti_asym_score(
+  score_marg_asrti <- compute_asrti_score(
     x = x_marg,
     y = y_marg,
     fit_mean = fit_mean,
@@ -355,7 +355,7 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
     x_cond <- rep(x0, n_conditional)
     y_cond <- generate_y_given_x(model_id, x_cond)
 
-    score_cond_hcti <- compute_hcti_score(
+    score_cond_srti <- compute_srti_score(
       x = x_cond,
       y = y_cond,
       fit_mean = fit_mean,
@@ -363,7 +363,7 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
       model_id = model_id
     )
 
-    score_cond_asym <- compute_hcti_asym_score(
+    score_cond_asrti <- compute_asrti_score(
       x = x_cond,
       y = y_cond,
       fit_mean = fit_mean,
@@ -382,10 +382,10 @@ run_one_diagnostic <- function(model_id, design, n_train, rep_id) {
     )
     dplyr::tibble(
     x = x0,
-    Method = c("HCTI", "HCTI-asym", "CQR-TI"),
+    Method = c("SR-TI", "ASR-TI", "CQR-TI"),
     ks_to_marginal = c(
-        ks_distance(score_cond_hcti, score_marg_hcti),
-        ks_distance(score_cond_asym, score_marg_asym),
+        ks_distance(score_cond_srti, score_marg_srti),
+        ks_distance(score_cond_asrti, score_marg_asrti),
         ks_distance(score_cond_cqr, score_marg_cqr)
     )
     )
@@ -582,8 +582,8 @@ theme_diag <- function(base_size = 12) {
 }
 
 method_cols <- c(
-  "HCTI" = "#D55E00",
-  "HCTI-asym" = "#CC79A7",
+  "SR-TI" = "#D55E00",
+  "ASR-TI" = "#CC79A7",
   "CQR-TI" = "#0072B2"
 )
 

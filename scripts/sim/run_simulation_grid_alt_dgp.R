@@ -15,10 +15,11 @@ source("R/sim/data_generate_alt.R")
 source("R/sim/truth_content_alt.R")
 
 # ---- methods ----
-source("R/sim/fit_hcti.R")
+source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")
 source("R/sim/pti_utils.R")
+source("R/sim/guo_young_ti.R")
 source("R/sim/one_replication.R")
 
 # ---- run setting ----
@@ -48,6 +49,20 @@ M <- 1000
 
 design_vec <- c("uniform", "normal")
 
+format_elapsed <- function(seconds) {
+  seconds <- max(0, as.numeric(seconds))
+  days <- floor(seconds / 86400)
+  hours <- floor((seconds %% 86400) / 3600)
+  minutes <- floor((seconds %% 3600) / 60)
+  secs <- floor(seconds %% 60)
+
+  if (days > 0) {
+    sprintf("%dd %02d:%02d:%02d", days, hours, minutes, secs)
+  } else {
+    sprintf("%02d:%02d:%02d", hours, minutes, secs)
+  }
+}
+
 # ---------------------------
 # Parallel
 # ---------------------------
@@ -66,10 +81,11 @@ clusterEvalQ(cl, {
   src("R/sim/data_generate_alt.R")
   src("R/sim/truth_content_alt.R")
 
-  src("R/sim/fit_hcti.R")
+  src("R/sim/fit_srti.R")
   src("R/sim/fit_cqr.R")
   src("R/sim/lambda_hoeffding.R")
   src("R/sim/pti_utils.R")
+  src("R/sim/guo_young_ti.R")
   src("R/sim/one_replication.R")
   src("R/sim/run_one_setting.R")
 
@@ -83,20 +99,37 @@ all_pointwise <- list()
 all_marginal  <- list()
 all_px_good   <- list()
 
+total_settings <- length(design_vec) * length(models) * length(n_cal_vec)
+setting_index <- 0L
+simulation_started_at <- Sys.time()
+
+cat(
+  "[SIMULATION START]",
+  format(simulation_started_at, "%Y-%m-%d %H:%M:%S"),
+  "| settings:", total_settings,
+  "| workers:", n_cores,
+  "\n"
+)
+
 for (design in design_vec) {
   for (model_id in models) {
     for (n_cal in n_cal_vec) {
 
       n_train <- n_cal
+      setting_index <- setting_index + 1L
+      setting_started_at <- Sys.time()
 
       cat(
-        "[START] design:", design,
+        "\n[SETTING START]", paste0(setting_index, "/", total_settings),
+        "| design:", design,
         "model:", model_id,
         "n_train:", n_train,
         "n_cal:", n_cal,
         "n_test:", n_test,
+        "| time:", format(setting_started_at, "%Y-%m-%d %H:%M:%S"),
         "\n"
       )
+      flush.console()
 
       res_one <- run_one_setting(
         model_id = model_id,
@@ -122,6 +155,28 @@ for (design in design_vec) {
       all_pointwise[[key]] <- res_one$pointwise
       all_marginal[[key]]  <- res_one$marginal
       all_px_good[[key]]   <- res_one$px_good
+
+      setting_elapsed <- as.numeric(
+        difftime(Sys.time(), setting_started_at, units = "secs")
+      )
+      total_elapsed <- as.numeric(
+        difftime(Sys.time(), simulation_started_at, units = "secs")
+      )
+      average_setting <- total_elapsed / setting_index
+      remaining_seconds <- average_setting *
+        (total_settings - setting_index)
+      estimated_finish <- Sys.time() + remaining_seconds
+
+      cat(
+        "[SETTING DONE] ", setting_index, "/", total_settings,
+        " | setting ", format_elapsed(setting_elapsed),
+        " | total ", format_elapsed(total_elapsed),
+        " | remaining ~", format_elapsed(remaining_seconds),
+        " | ETA ", format(estimated_finish, "%Y-%m-%d %H:%M:%S"),
+        "\n",
+        sep = ""
+      )
+      flush.console()
     }
   }
 }
@@ -135,9 +190,9 @@ pointwise_df <- dplyr::bind_rows(all_pointwise)
 marginal_df  <- dplyr::bind_rows(all_marginal)
 px_good_df   <- dplyr::bind_rows(all_px_good)
 
-pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+pointwise_path <- "results/sim/models/pointwise_success_5methods_alt_dgp_design_uniform_normal.csv"
+marginal_path  <- "results/sim/models/marginal_pac_5methods_alt_dgp_design_uniform_normal.csv"
+px_good_path   <- "results/sim/models/px_good_proportion_5methods_alt_dgp_design_uniform_normal.csv"
 
 readr::write_csv(pointwise_df, pointwise_path)
 readr::write_csv(marginal_df, marginal_path)
@@ -146,3 +201,12 @@ readr::write_csv(px_good_df, px_good_path)
 cat("Saved pointwise to:", pointwise_path, "\n")
 cat("Saved marginal to:", marginal_path, "\n")
 cat("Saved PX-good to:", px_good_path, "\n")
+cat(
+  "[SIMULATION DONE] total elapsed:",
+  format_elapsed(difftime(
+    Sys.time(),
+    simulation_started_at,
+    units = "secs"
+  )),
+  "\n"
+)
