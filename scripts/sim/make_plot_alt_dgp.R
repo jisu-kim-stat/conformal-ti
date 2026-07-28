@@ -9,12 +9,21 @@ suppressPackageStartupMessages({
 # ============================================================
 # Paths
 # ============================================================
-pointwise_path <- "results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-marginal_path  <- "results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
-px_good_path   <- "results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+pointwise_path <- "/Users/jisukim/ti_project/results/sim/models/pointwise_success_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+marginal_path  <- "/Users/jisukim/ti_project/results/sim/models/marginal_pac_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
+px_good_path   <- "/Users/jisukim/ti_project/results/sim/models/px_good_proportion_hcti_asym_cqr_pti_alt_dgp_design_uniform_normal.csv"
 
 out_dir <- "results/sim/models/plots_alt_dgp"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+models_keep <- 1:5
+model_labels <- c(
+  "1" = "Gaussian",
+  "2" = "Heavy-tailed",
+  "3" = "Heteroscedastic",
+  "4" = "Globally skewed",
+  "5" = "X-dependent\nskewness"
+)
 
 content_level <- 0.90
 confidence_level <- 0.95
@@ -28,7 +37,7 @@ cat("[make_plot] output dir:", out_dir, "\n")
 # Plot style
 # ============================================================
 
-theme_pac_paper <- function(base_size = 12) {
+theme_pac_paper <- function(base_size = 10) {
   theme_classic(base_size = base_size) +
     theme(
       plot.title = element_text(
@@ -67,26 +76,25 @@ theme_pac_paper <- function(base_size = 12) {
     )
 }
 
-method_levels <- c("HCTI", "HCTI-asym", "CQR-TI", "Parametric-TI")
+method_levels <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI")
 
-# Proposed methods emphasized; parametric baseline muted.
 method_cols <- c(
-  "HCTI" = "#D55E00",
-  "HCTI-asym" = "#CC79A7",
+  "SR-TI" = "#D55E00",
+  "ASR-TI" = "#CC79A7",
   "CQR-TI" = "#0072B2",
   "Parametric-TI" = "#555555"
 )
 
 method_shapes <- c(
-  "HCTI" = 16,
-  "HCTI-asym" = 18,
+  "SR-TI" = 16,
+  "ASR-TI" = 18,
   "CQR-TI" = 17,
   "Parametric-TI" = 15
 )
 
 method_linetypes <- c(
-  "HCTI" = "solid",
-  "HCTI-asym" = "solid",
+  "SR-TI" = "solid",
+  "ASR-TI" = "solid",
   "CQR-TI" = "solid",
   "Parametric-TI" = "solid"
 )
@@ -96,13 +104,19 @@ method_linetypes <- c(
 # ============================================================
 
 pointwise_df <- readr::read_csv(pointwise_path, show_col_types = FALSE) %>%
-  dplyr::filter(Method != "NCQR-TI")
+  dplyr::filter(
+    as.integer(model) %in% models_keep
+  )
 
 marginal_df <- readr::read_csv(marginal_path, show_col_types = FALSE) %>%
-  dplyr::filter(Method != "NCQR-TI")
+  dplyr::filter(
+    as.integer(model) %in% models_keep
+  )
 
 px_good_df <- readr::read_csv(px_good_path, show_col_types = FALSE) %>%
-  dplyr::filter(Method != "NCQR-TI")
+  dplyr::filter(
+    as.integer(model) %in% models_keep
+  )
 
 # ============================================================
 # Type cleanup and labels
@@ -120,7 +134,8 @@ pointwise_df <- pointwise_df %>%
     Method = factor(Method, levels = method_levels),
     model_lab = factor(
       paste0("Model ", model),
-      levels = paste0("Model ", sort(unique(model)))
+      levels = paste0("Model ", models_keep),
+      labels = unname(model_labels[as.character(models_keep)])
     ),
     ncal_lab = factor(
       paste0("n_cal = ", n_cal),
@@ -136,7 +151,11 @@ marginal_df <- marginal_df %>%
     n_cal = as.integer(n_cal),
     n_test = as.integer(n_test),
     Method = factor(Method, levels = method_levels),
-    model_lab = paste0("Model ", model)
+    model_lab = factor(
+      paste0("Model ", model),
+      levels = paste0("Model ", models_keep),
+      labels = unname(model_labels[as.character(models_keep)])
+    )
   )
 
 px_good_df <- px_good_df %>%
@@ -148,7 +167,11 @@ px_good_df <- px_good_df %>%
     n_test = as.integer(n_test),
     epsilon = as.numeric(epsilon),
     Method = factor(Method, levels = method_levels),
-    model_lab = paste0("Model ", model),
+    model_lab = factor(
+      paste0("Model ", model),
+      levels = paste0("Model ", models_keep),
+      labels = unname(model_labels[as.character(models_keep)])
+    ),
     eps_lab = paste0("\u03b5 = ", epsilon)
   )
 
@@ -224,7 +247,10 @@ for (des in design_vec) {
     scale_color_manual(values = method_cols, drop = FALSE) +
     scale_shape_manual(values = method_shapes, drop = FALSE) +
     scale_x_continuous(breaks = sort(unique(marginal_des$n_cal))) +
-    coord_cartesian(ylim = c(0, 1.03)) +
+    coord_cartesian(ylim = c(0.80, 1.01)) +
+    scale_y_continuous(
+      breaks = c(0.80, 0.85, 0.90, 0.95, 1.00)
+    ) + 
     labs(
       title = paste0("Marginal PAC success under ", des_title),
       subtitle = paste0("Dashed line: target probability ", confidence_level),
@@ -438,7 +464,6 @@ for (des in design_vec) {
 
   pointwise_plot_df <- pointwise_des %>%
     filter(
-      model != 6,
       abs(epsilon - 0) < 1e-12
     )
 
@@ -527,43 +552,245 @@ for (des in design_vec) {
     dpi = 300
   )
 
-  # ------------------------------------------------------------
-  # Figure 7: Conditional mean interval width curve
-  # Appendix-style diagnostic
+    # ------------------------------------------------------------
+  # Figure 7: Conditional interval width diagnostics
   # ------------------------------------------------------------
 
-  p_pointwise_width <- ggplot(
-    pointwise_plot_df,
-    aes(
-      x = x,
-      y = mean_width,
-      color = Method,
-      group = Method
+  if (des == "normal") {
+
+    # Central 98% region under N(0,1)
+    central_prob <- 0.98
+    tail_prob <- (1 - central_prob) / 2
+    central_x_lim <- qnorm(c(tail_prob, 1 - tail_prob))
+
+    central_width_df <- pointwise_plot_df %>%
+      filter(
+        x >= central_x_lim[1],
+        x <= central_x_lim[2]
+      )
+
+    # ==========================================================
+    # 7a. All methods over the central 98% covariate region
+    # Main conditional-width comparison
+    # ==========================================================
+
+    p_width_central <- ggplot(
+      central_width_df,
+      aes(
+        x = x,
+        y = mean_width,
+        color = Method,
+        group = Method
+      )
+    ) +
+      geom_line(linewidth = 0.75) +
+      facet_grid(
+        rows = vars(model_lab),
+        cols = vars(ncal_lab),
+        labeller = label_value,
+        scales = "free_y",
+        drop = FALSE
+      ) +
+      scale_color_manual(
+        values = method_cols,
+        drop = FALSE
+      ) +
+      scale_x_continuous(
+        breaks = c(-2, -1, 0, 1, 2)
+      ) +
+      labs(
+        title = paste0(
+          "Conditional mean interval width in the central ",
+          central_prob * 100,
+          "% covariate region"
+        ),
+        subtitle = paste0(
+          "Normal covariate design; ",
+          round(central_x_lim[1], 2),
+          " \u2264 x \u2264 ",
+          round(central_x_lim[2], 2),
+          "."
+        ),
+        x = "Covariate x",
+        y = "Mean interval width"
+      ) +
+      theme_pac_paper(base_size = 10.5)
+
+    ggsave(
+      filename = file.path(
+        design_out_dir,
+        "app_conditional_width_central98_normal.png"
+      ),
+      plot = p_width_central,
+      width = 14,
+      height = 10.5,
+      dpi = 300
     )
-  ) +
-    geom_line(linewidth = 0.7) +
-    facet_grid(
-      rows = vars(model_lab),
-      cols = vars(ncal_lab),
-      labeller = label_value,
-      scales = "free"
-    ) +
-    scale_color_manual(values = method_cols, drop = FALSE) +
-    labs(
-      title = paste0("Conditional mean interval width under ", des_title),
-      subtitle = des_eval,
-      x = "Covariate x",
-      y = "Mean interval width"
-    ) +
-    theme_pac_paper(base_size = 10.5)
 
-  ggsave(
-    filename = file.path(design_out_dir, paste0("app_conditional_width_", des, ".png")),
-    plot = p_pointwise_width,
-    width = 14,
-    height = 9,
-    dpi = 300
-  )
+    # ==========================================================
+    # 7b. Score-based intervals over the full covariate range
+    # Parametric extrapolation does not compress the other curves
+    # ==========================================================
+
+    score_width_df <- pointwise_plot_df %>%
+      filter(
+        Method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+      ) %>%
+      droplevels()
+
+    p_width_score_full <- ggplot(
+      score_width_df,
+      aes(
+        x = x,
+        y = mean_width,
+        color = Method,
+        group = Method
+      )
+    ) +
+      geom_line(linewidth = 0.75) +
+      facet_grid(
+        rows = vars(model_lab),
+        cols = vars(ncal_lab),
+        labeller = label_value,
+        scales = "free_y",
+        drop = FALSE
+      ) +
+      scale_color_manual(
+        values = method_cols[
+          c("SR-TI", "ASR-TI", "CQR-TI")
+        ],
+        drop = FALSE
+      ) +
+      labs(
+        title = paste0(
+          "Conditional mean width of score-based intervals under ",
+          des_title
+        ),
+        subtitle = paste0(
+          des_eval,
+          " Parametric-TI is displayed separately because of tail extrapolation."
+        ),
+        x = "Covariate x",
+        y = "Mean interval width"
+      ) +
+      theme_pac_paper(base_size = 10.5)
+
+    ggsave(
+      filename = file.path(
+        design_out_dir,
+        "app_conditional_width_score_based_full_normal.png"
+      ),
+      plot = p_width_score_full,
+      width = 14,
+      height = 10.5,
+      dpi = 300
+    )
+
+    # ==========================================================
+    # 7c. Parametric-TI over the full covariate range
+    # Pseudo-log scale preserves small widths and tail explosion
+    # ==========================================================
+
+    parametric_width_df <- pointwise_plot_df %>%
+      filter(Method == "Parametric-TI") %>%
+      droplevels()
+
+    p_width_parametric_full <- ggplot(
+      parametric_width_df,
+      aes(
+        x = x,
+        y = mean_width,
+        group = Method
+      )
+    ) +
+      geom_line(
+        color = method_cols["Parametric-TI"],
+        linewidth = 0.8
+      ) +
+      facet_grid(
+        rows = vars(model_lab),
+        cols = vars(ncal_lab),
+        labeller = label_value,
+        scales = "free_y",
+        drop = FALSE
+      ) +
+      scale_y_continuous(
+        trans = scales::pseudo_log_trans(sigma = 1)
+      ) +
+      labs(
+        title = paste0(
+          "Conditional mean width of Parametric-TI under ",
+          des_title
+        ),
+        subtitle = paste0(
+          des_eval,
+          " The vertical axis uses a pseudo-log scale to display tail extrapolation."
+        ),
+        x = "Covariate x",
+        y = "Mean interval width (pseudo-log scale)"
+      ) +
+      theme_pac_paper(base_size = 10.5) +
+      theme(
+        legend.position = "none"
+      )
+
+    ggsave(
+      filename = file.path(
+        design_out_dir,
+        "app_conditional_width_parametric_full_normal.png"
+      ),
+      plot = p_width_parametric_full,
+      width = 14,
+      height = 10.5,
+      dpi = 300
+    )
+
+  } else {
+
+    # Uniform design: the full common support can be shown directly
+    p_pointwise_width <- ggplot(
+      pointwise_plot_df,
+      aes(
+        x = x,
+        y = mean_width,
+        color = Method,
+        group = Method
+      )
+    ) +
+      geom_line(linewidth = 0.75) +
+      facet_grid(
+        rows = vars(model_lab),
+        cols = vars(ncal_lab),
+        labeller = label_value,
+        scales = "free_y",
+        drop = FALSE
+      ) +
+      scale_color_manual(
+        values = method_cols,
+        drop = FALSE
+      ) +
+      labs(
+        title = paste0(
+          "Conditional mean interval width under ",
+          des_title
+        ),
+        subtitle = des_eval,
+        x = "Covariate x",
+        y = "Mean interval width"
+      ) +
+      theme_pac_paper(base_size = 10.5)
+
+    ggsave(
+      filename = file.path(
+        design_out_dir,
+        paste0("app_conditional_width_", des, ".png")
+      ),
+      plot = p_pointwise_width,
+      width = 14,
+      height = 10.5,
+      dpi = 300
+    )
+  }
 
   # ------------------------------------------------------------
   # Save summary tables
@@ -577,16 +804,6 @@ for (des in design_vec) {
   readr::write_csv(
     px_good_des,
     file.path(design_out_dir, "summary_px_good_proportion.csv")
-  )
-
-  readr::write_csv(
-    marginal_des %>% filter(model == 6),
-    file.path(design_out_dir, "summary_model6_marginal.csv")
-  )
-
-  readr::write_csv(
-    px_good_des %>% filter(model == 6),
-    file.path(design_out_dir, "summary_model6_px_good.csv")
   )
 
   cat("[make_plot] saved plots to:", design_out_dir, "\n")

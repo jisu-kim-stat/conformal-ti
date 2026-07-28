@@ -42,17 +42,17 @@ pivotality_good_summary <- readr::read_csv(good_path, show_col_types = FALSE)
 # Labels and style
 # ------------------------------------------------------------
 
-method_levels <- c("HCTI", "HCTI-asym", "CQR-TI")
+method_levels <- c("SR-TI", "ASR-TI", "CQR-TI")
 
 method_cols <- c(
-  "HCTI" = "#D55E00",
-  "HCTI-asym" = "#CC79A7",
+  "SR-TI" = "#D55E00",
+  "ASR-TI" = "#CC79A7",
   "CQR-TI" = "#0072B2"
 )
 
 method_shapes <- c(
-  "HCTI" = 16,
-  "HCTI-asym" = 18,
+  "SR-TI" = 16,
+  "ASR-TI" = 18,
   "CQR-TI" = 17
 )
 
@@ -90,7 +90,10 @@ clean_common <- function(df) {
   df %>%
     mutate(
       model = as.integer(model),
-      n_train = as.integer(n_train),
+      n_train = as.integer(n_train)
+    ) %>%
+    filter(model <= 5) %>%
+    mutate(
       design = as.character(design),
       model_lab = factor(
         paste0("Model ", model),

@@ -151,7 +151,7 @@ run_one_setting <- function(model_id,
 
       tryCatch({
 
-        if (method %in% c("HCTI", "HCTI-asym", "CQR-TI")) {
+        if (method %in% c("SR-TI", "ASR-TI", "CQR-TI")) {
 
           r <- one_replication_ours(
             method = method,
@@ -219,14 +219,14 @@ run_one_setting <- function(model_id,
     }
   }
 
-  long_hcti <- run_method_long("HCTI")
-  long_hcti_asym <- run_method_long("HCTI-asym")
+  long_srti <- run_method_long("SR-TI")
+  long_asrti <- run_method_long("ASR-TI")
   long_cqr <- run_method_long("CQR-TI")
   long_pti <- run_method_long("Parametric-TI")
 
   long_list <- list(
-    "HCTI" = long_hcti,
-    "HCTI-asym" = long_hcti_asym,
+    "SR-TI" = long_srti,
+    "ASR-TI" = long_asrti,
     "CQR-TI" = long_cqr,
     "Parametric-TI" = long_pti
   )
