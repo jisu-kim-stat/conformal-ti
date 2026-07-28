@@ -122,6 +122,10 @@ pivotality_good_summary <- pivotality_good_summary %>%
   )
 
 n_train_breaks <- sort(unique(estimation_summary$n_train))
+ks_ylim <- c(
+  0,
+  max(pivotality_summary$ks_q90, na.rm = TRUE) * 1.05
+)
 
 # ------------------------------------------------------------
 # Main Figure: Score pivotality KS q90
@@ -139,7 +143,8 @@ p_ks_main <- ggplot(
 ) +
   geom_line(linewidth = 0.85) +
   geom_point(size = 2.5, alpha = 0.95) +
-  facet_grid(design_lab ~ model_lab, scales = "free_y") +
+  facet_grid(design_lab ~ model_lab, scales = "fixed") +
+  coord_cartesian(ylim = ks_ylim) +
   scale_color_manual(values = method_cols, drop = FALSE) +
   scale_shape_manual(values = method_shapes, drop = FALSE) +
   scale_x_continuous(breaks = n_train_breaks) +
@@ -178,7 +183,8 @@ for (des in sort(unique(pivotality_summary$design))) {
   ) +
     geom_line(linewidth = 0.85) +
     geom_point(size = 2.5, alpha = 0.95) +
-    facet_wrap(~ model_lab, nrow = 1, scales = "free_y") +
+    facet_wrap(~ model_lab, nrow = 1, scales = "fixed") +
+    coord_cartesian(ylim = ks_ylim) +
     scale_color_manual(values = method_cols, drop = FALSE) +
     scale_shape_manual(values = method_shapes, drop = FALSE) +
     scale_x_continuous(breaks = n_train_breaks) +
