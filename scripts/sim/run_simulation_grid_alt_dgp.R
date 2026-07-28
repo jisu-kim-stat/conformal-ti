@@ -44,7 +44,7 @@ content_level <- 0.90
 alpha <- 0.05
 epsilon_grid <- c(0, 0.01, 0.02, 0.03, 0.05)
 
-M <- 100
+M <- 1000
 
 design_vec <- c("uniform", "normal")
 
