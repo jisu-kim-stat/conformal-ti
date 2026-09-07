@@ -30,28 +30,12 @@ pac_alpha     = 0.05
 ## Structure
 ```text
 ti_project/
-├── data/
-│   └── real/
-│       └── redshift/
-│           ├── happy_A
-│           └── happy_B
 ├── scripts/
 │   ├── sim/
-│   └── real/
-│       ├── redshift/
-│       └── tsa/
 ├── results/
 │   ├── sim/
-│   └── real/
-│       ├── redshift/
-│       └── tsa/
 ├── fig/
-│   ├── sim/
-│   │   ├── uniform/
-│   │   └── normal/
-│   └── real/
-│       ├── redshift/
-│       └── tsa/
+│   └── sim/
 └── README.md
 ```
 
@@ -107,40 +91,6 @@ Quick validation:
 
 ```text
 Rscript tests/test_sim_ti_methods.R
-```
-
-## Real Data
-The repository includes two real-data applications:
-1. Reashift Data
-2. TSA passenger throughput data
-
-#### Redshift
-Run : 
-```bash
-python scripts/real/redshift/real_redshift_4methods.py
-```
-Plot :
-```bash
-python scripts/real/redshift/plot_redshift_4methods.py \
-  --summary results/real/redshift/results_redshift_4methods.csv \
-  --out_dir fig/real/redshift \
-  --content_level 0.90
-```
-
-### TSA
-Run : 
-```bash
-python scripts/real/tsa/real_tsa_4methods.py \
-  --split_mode random
-```
-Plot :
-```bash
-python scripts/real/tsa/plot_tsa_4methods.py \
-  --summary results/real/tsa/results_tsa_4methods.csv \
-  --intervals results/real/tsa/results_tsa_4methods_intervals.csv \
-  --out_dir fig/real/tsa \
-  --content_level 0.90 \
-  --window 14
 ```
 
 ## Notes
