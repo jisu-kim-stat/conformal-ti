@@ -51,7 +51,7 @@ def itf(z: np.ndarray) -> np.ndarray:
 # Common PAC calibration helpers
 # ============================================================
 def pac_lambda(pac_alpha: float, n_cal: int) -> float:
-    return float(np.sqrt(np.log(2.0 / pac_alpha) / (2.0 * n_cal)))
+    return float(np.sqrt(np.log(1.0 / pac_alpha) / (2.0 * n_cal)))
 
 
 def adjusted_quantile(scores: np.ndarray, content_level: float, pac_alpha: float) -> tuple[float, float, float]:

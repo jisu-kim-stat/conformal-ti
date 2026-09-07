@@ -1,6 +1,39 @@
 # R/sim/lambda_hoeffding.R
 
-find_score_cutoff <- function(mis, alpha, score) {
+pac_calibration_index <- function(n, content, alpha,
+                                  calibration_rule = c(
+                                    "hoeffding",
+                                    "exact_binomial"
+                                  )) {
+  calibration_rule <- match.arg(calibration_rule)
+
+  stopifnot(
+    length(n) == 1L, n >= 1L,
+    length(content) == 1L, content > 0, content < 1,
+    length(alpha) == 1L, alpha > 0, alpha < 1
+  )
+
+  if (calibration_rule == "hoeffding") {
+    k <- ceiling(
+      n * content + sqrt(n * log(1 / alpha) / 2)
+    )
+  } else {
+    # Smallest k such that
+    # P{Binomial(n, content) >= k} <= alpha.
+    k <- stats::qbinom(1 - alpha, size = n, prob = content) + 1L
+  }
+
+  min(as.integer(k), n + 1L)
+}
+
+
+find_score_cutoff <- function(mis, alpha, score,
+                              calibration_rule = c(
+                                "hoeffding",
+                                "exact_binomial"
+                              )) {
+
+  calibration_rule <- match.arg(calibration_rule)
 
   stopifnot(
     mis > 0, mis < 1,
@@ -10,26 +43,32 @@ find_score_cutoff <- function(mis, alpha, score) {
 
   n <- length(score)
 
-  C <- 1 - mis
+  k <- pac_calibration_index(
+    n = n,
+    content = 1 - mis,
+    alpha = alpha,
+    calibration_rule = calibration_rule
+  )
 
-  lambda_hoef <- sqrt(log(2 / alpha) / (2 * n))
-
-  target <- C + lambda_hoef
-
-  if (target > 1) {
+  # No finite order statistic can attain the requested distribution-free
+  # guarantee. This does not occur in the simulation settings considered here.
+  if (k == n + 1L) {
     return(NA_real_)
   }
 
   score_sorted <- sort(score)
 
-  idx <- ceiling(n * target)
-  idx <- min(max(idx, 1), n)
-
-  score_sorted[idx]
+  score_sorted[k]
 }
 
 # SR-TI
-find_lambda_hat <- function(mis, alpha, y, pred, variance) {
+find_lambda_hat <- function(mis, alpha, y, pred, variance,
+                            calibration_rule = c(
+                              "hoeffding",
+                              "exact_binomial"
+                            )) {
+
+  calibration_rule <- match.arg(calibration_rule)
 
   stopifnot(
     length(y) == length(pred),
@@ -41,7 +80,8 @@ find_lambda_hat <- function(mis, alpha, y, pred, variance) {
   find_score_cutoff(
     mis = mis,
     alpha = alpha,
-    score = score
+    score = score,
+    calibration_rule = calibration_rule
   )
 }
 

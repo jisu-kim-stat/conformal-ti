@@ -9,7 +9,26 @@ run_one_setting <- function(model_id,
                             alpha,
                             epsilon_grid = c(0, 0.01, 0.02, 0.03, 0.05),
                             design = "uniform",
-                            n_bins = 50) {
+                            n_bins = 50,
+                            cqr_basis_df = 8,
+                            cqr_basis_type = c("cv_fixed_ns", "fixed_ns", "legacy_bs"),
+                            cqr_df_grid = c(4, 6, 8, 10, 12),
+                            cqr_cv_folds = 5,
+                            heavy_tail_scale = c("original", "unit_variance"),
+                            methods = c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI"),
+                            calibration_rule = c(
+                              "hoeffding",
+                              "exact_binomial"
+                            )) {
+
+  calibration_rule <- match.arg(calibration_rule)
+  heavy_tail_scale <- match.arg(heavy_tail_scale)
+  cqr_basis_type <- match.arg(cqr_basis_type)
+  stopifnot(model_id %in% 1:4)
+  stopifnot(length(cqr_basis_df) == 1L, is.finite(cqr_basis_df), cqr_basis_df >= 4)
+  stopifnot(all(cqr_df_grid >= 4L), cqr_cv_folds >= 2L)
+  allowed_methods <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
+  stopifnot(length(methods) >= 1L, all(methods %in% allowed_methods))
 
   content_level <- content
   alpha_conf <- alpha
@@ -59,7 +78,13 @@ run_one_setting <- function(model_id,
     out$n_train <- n_train
     out$n_cal <- n_cal
     out$n_test <- n_test
+    out$cqr_basis_df <- cqr_basis_df
+    out$cqr_basis_type <- cqr_basis_type
+    out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
+    out$calibration_rule <- if (
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+    ) calibration_rule else "not_applicable"
 
     out
   }
@@ -91,7 +116,13 @@ run_one_setting <- function(model_id,
     out$n_train <- n_train
     out$n_cal <- n_cal
     out$n_test <- n_test
+    out$cqr_basis_df <- cqr_basis_df
+    out$cqr_basis_type <- cqr_basis_type
+    out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
+    out$calibration_rule <- if (
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+    ) calibration_rule else "not_applicable"
 
     out
   }
@@ -125,7 +156,13 @@ run_one_setting <- function(model_id,
     out$n_train <- n_train
     out$n_cal <- n_cal
     out$n_test <- n_test
+    out$cqr_basis_df <- cqr_basis_df
+    out$cqr_basis_type <- cqr_basis_type
+    out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
+    out$calibration_rule <- if (
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+    ) calibration_rule else "not_applicable"
 
     out
   }
@@ -138,14 +175,16 @@ run_one_setting <- function(model_id,
       .packages = c("dplyr", "mgcv", "glmnet", "quantreg", "splines", "MASS"),
       .export = c(
         "model_id", "n_train", "n_cal", "n_test",
-        "content_level", "alpha_conf", "design",
+        "content_level", "alpha_conf", "design", "calibration_rule",
+        "cqr_basis_df", "cqr_basis_type", "cqr_df_grid", "cqr_cv_folds", "heavy_tail_scale",
         "one_replication_ours", "one_replication_pti", "one_replication_gy",
         "base_mean", "generate_data", "content_function", "generate_eval_data",
         "fit_mean_model", "fit_var_model", "predict_mean", "predict_var",
         "fit_mean_model_auto", "fit_var_model_auto", "predict_mean_auto", "predict_var_auto",
-        "fit_quantile_model", "predict_quantile", 
+        "fixed_cqr_knots", "pinball_loss", "fit_fixed_ns_quantile",
+        "select_quantile_spline_df", "fit_quantile_model", "predict_quantile", 
         "fit_quantile_model_auto", "predict_quantile_auto",
-        "find_lambda_hat", "find_score_cutoff",
+        "pac_calibration_index", "find_lambda_hat", "find_score_cutoff",
         "classical_parametric_design", "classical_parametric_ti",
         "find_parametric_k_factor", "find_asym_shape", "asym_residual_score",
         "gy_fit_smoothing_spline", "gy_predict_smoother", "gy_pointwise_ti",
@@ -166,7 +205,13 @@ run_one_setting <- function(model_id,
             content = content_level,
             alpha = alpha_conf,
             seed = b,
-            design = design
+            design = design,
+            cqr_basis_df = cqr_basis_df,
+            cqr_basis_type = cqr_basis_type,
+            cqr_df_grid = cqr_df_grid,
+            cqr_cv_folds = cqr_cv_folds,
+            heavy_tail_scale = heavy_tail_scale,
+            calibration_rule = calibration_rule
           )
 
         } else if (method == "Parametric-TI") {
@@ -179,7 +224,8 @@ run_one_setting <- function(model_id,
             content = content_level,
             alpha = alpha_conf,
             seed = b,
-            design = design
+            design = design,
+            heavy_tail_scale = heavy_tail_scale
           )
 
         } else if (method == "GY-TI") {
@@ -192,7 +238,8 @@ run_one_setting <- function(model_id,
             content = content_level,
             alpha = alpha_conf,
             seed = b,
-            design = design
+            design = design,
+            heavy_tail_scale = heavy_tail_scale
           )
 
         } else {
@@ -269,12 +316,9 @@ run_one_setting <- function(model_id,
     out
   }
 
-  long_list <- list(
-    "SR-TI" = timed_run_method("SR-TI"),
-    "ASR-TI" = timed_run_method("ASR-TI"),
-    "CQR-TI" = timed_run_method("CQR-TI"),
-    "Parametric-TI" = timed_run_method("Parametric-TI"),
-    "GY-TI" = timed_run_method("GY-TI")
+  long_list <- stats::setNames(
+    lapply(methods, timed_run_method),
+    methods
   )
 
   pointwise_df <- dplyr::bind_rows(
@@ -285,7 +329,8 @@ run_one_setting <- function(model_id,
     dplyr::select(
       x, x_bin, bin_count, epsilon,
       mean_content, pointwise_success, mean_width, na_proportion,
-      model, design, n_train, n_cal, n_test, Method
+      model, design, n_train, n_cal, n_test, cqr_basis_df, cqr_basis_type, heavy_tail_scale,
+      Method, calibration_rule
     )
 
   marginal_df <- dplyr::bind_rows(
@@ -296,7 +341,8 @@ run_one_setting <- function(model_id,
     dplyr::select(
       marginal_content_mean, marginal_content_sd, marginal_pac_success,
       average_width_mean, average_width_sd, na_proportion,
-      model, design, n_train, n_cal, n_test, Method
+      model, design, n_train, n_cal, n_test, cqr_basis_df, cqr_basis_type, heavy_tail_scale,
+      Method, calibration_rule
     )
 
   px_good_df <- dplyr::bind_rows(
@@ -313,7 +359,8 @@ run_one_setting <- function(model_id,
       median_pointwise_success, q75_pointwise_success,
       max_pointwise_success,
       mean_pointwise_success, mean_content, mean_width, na_proportion,
-      model, design, n_train, n_cal, n_test, Method
+      model, design, n_train, n_cal, n_test, cqr_basis_df, cqr_basis_type, heavy_tail_scale,
+      Method, calibration_rule
     )
 
   list(

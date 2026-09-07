@@ -1,6 +1,6 @@
 \begin{table}[!h]
 \centering
-\caption{\label{tab:marginal-pac-representative}Monte Carlo estimates of marginal PAC success for the heteroscedastic Model~3 and globally skewed Model~4. Each entry reports the empirical marginal PAC success probability, with average interval width in parentheses. The upper and lower panels correspond to $X\sim N(0,1)$ and $X\sim\operatorname{Unif}(-2,2)$, respectively. Bold success probabilities fall below the target $1-\alpha=0.95$. Results are based on $M=1000$ Monte Carlo replications.}
+\caption{\label{tab:marginal-pac-models34}Empirical marginal PAC success for heteroscedastic Model~3 and globally skewed Model~4, with mean interval width in parentheses, under the normal and uniform covariate designs. Bold entries fall below the target \(1-\alpha=0.95\). Results are based on \(M=1000\) Monte Carlo replications.}
 \centering
 \fontsize{9}{11}\selectfont
 \begin{tabular}[t]{llccc}
@@ -10,27 +10,27 @@ Model & Method & $n_{\mathrm{cal}}=200$ & $n_{\mathrm{cal}}=500$ & $n_{\mathrm{c
 \addlinespace[0.3em]
 \hline
 \multicolumn{5}{l}{\textbf{Normal covariate design}}\\
-\hspace{1em}Model 3 & SR-TI & 1.000 (50.31) & 1.000 (7.68) & 1.000 (6.92)\\
-\hspace{1em} & ASR-TI & 1.000 (50.50) & 1.000 (7.70) & 1.000 (6.93)\\
-\hspace{1em} & CQR-TI & 1.000 (38.89) & 1.000 (8.21) & 1.000 (7.40)\\
+\hspace{1em}Model 3 & SR-TI & 1.000 (13.01) & 1.000 (7.45) & 1.000 (6.82)\\
+\hspace{1em} & ASR-TI & 1.000 (13.04) & 1.000 (7.46) & 1.000 (6.82)\\
+\hspace{1em} & CQR-TI & 1.000 (14.86) & 1.000 (7.95) & 1.000 (7.28)\\
 \hspace{1em} & Parametric-TI & \textbf{0.949} (6.64) & 0.960 (6.49) & 0.983 (6.41)\\
 \hspace{1em} & GY-TI & \textbf{0.835} (6.64) & \textbf{0.921} (6.48) & 0.963 (6.40)\\
-\hspace{1em}Model 4 & SR-TI & 1.000 (26.39) & 1.000 (4.80) & 1.000 (3.83)\\
-\hspace{1em} & ASR-TI & 1.000 (27.08) & 1.000 (3.98) & 1.000 (3.37)\\
-\hspace{1em} & CQR-TI & 1.000 (23.99) & 1.000 (4.89) & 1.000 (4.30)\\
+\hspace{1em}Model 4 & SR-TI & 1.000 (9.58) & 1.000 (4.49) & 1.000 (3.69)\\
+\hspace{1em} & ASR-TI & 1.000 (8.73) & 1.000 (3.81) & 1.000 (3.32)\\
+\hspace{1em} & CQR-TI & 1.000 (9.28) & 1.000 (4.68) & 1.000 (4.26)\\
 \hspace{1em} & Parametric-TI & 0.996 (3.49) & 1.000 (3.43) & 1.000 (3.38)\\
 \hspace{1em} & GY-TI & 0.996 (3.58) & 1.000 (3.47) & 1.000 (3.40)\\
 \addlinespace[0.3em]
 \hline
 \multicolumn{5}{l}{\textbf{Uniform covariate design}}\\
-\hspace{1em}Model 3 & SR-TI & 1.000 (12.98) & 1.000 (8.44) & 1.000 (7.69)\\
-\hspace{1em} & ASR-TI & 1.000 (13.10) & 1.000 (8.46) & 1.000 (7.70)\\
-\hspace{1em} & CQR-TI & 1.000 (14.99) & 1.000 (8.96) & 1.000 (8.12)\\
+\hspace{1em}Model 3 & SR-TI & 1.000 (10.61) & 1.000 (8.19) & 1.000 (7.57)\\
+\hspace{1em} & ASR-TI & 1.000 (10.69) & 1.000 (8.21) & 1.000 (7.58)\\
+\hspace{1em} & CQR-TI & 1.000 (11.81) & 1.000 (8.69) & 1.000 (7.99)\\
 \hspace{1em} & Parametric-TI & \textbf{0.909} (7.29) & \textbf{0.904} (7.12) & \textbf{0.907} (7.04)\\
 \hspace{1em} & GY-TI & \textbf{0.891} (7.38) & \textbf{0.904} (7.16) & \textbf{0.902} (7.06)\\
-\hspace{1em}Model 4 & SR-TI & 1.000 (10.90) & 1.000 (4.67) & 1.000 (3.77)\\
-\hspace{1em} & ASR-TI & 1.000 (8.46) & 1.000 (3.79) & 1.000 (3.32)\\
-\hspace{1em} & CQR-TI & 1.000 (10.04) & 1.000 (4.54) & 1.000 (3.99)\\
+\hspace{1em}Model 4 & SR-TI & 1.000 (7.38) & 1.000 (4.37) & 1.000 (3.64)\\
+\hspace{1em} & ASR-TI & 1.000 (5.83) & 1.000 (3.66) & 1.000 (3.28)\\
+\hspace{1em} & CQR-TI & 1.000 (7.02) & 1.000 (4.35) & 1.000 (3.95)\\
 \hspace{1em} & Parametric-TI & 0.998 (3.50) & 1.000 (3.42) & 1.000 (3.38)\\
 \hspace{1em} & GY-TI & 0.998 (3.56) & 1.000 (3.44) & 1.000 (3.40)\\
 \bottomrule

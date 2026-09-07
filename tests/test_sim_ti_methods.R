@@ -4,8 +4,8 @@
 
 source("R/packages.R")
 source("R/sim/base_mean.R")
-source("R/sim/data_generate_alt.R")
-source("R/sim/truth_content_alt.R")
+source("R/sim/data_generate_balanced4.R")
+source("R/sim/truth_content_balanced4.R")
 source("R/sim/fit_srti.R")
 source("R/sim/fit_cqr.R")
 source("R/sim/lambda_hoeffding.R")

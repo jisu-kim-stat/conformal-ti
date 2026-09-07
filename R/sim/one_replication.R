@@ -33,12 +33,14 @@ one_replication_pti <- function(model_id,
                                 content,
                                 alpha,
                                 seed = NULL,
-                                design = "uniform") {
+                                design = "uniform",
+                                heavy_tail_scale = c("original", "unit_variance")) {
 
   if (!is.null(seed)) set.seed(seed)
+  heavy_tail_scale <- match.arg(heavy_tail_scale)
 
   stopifnot(
-    model_id %in% 1:6,
+    model_id %in% 1:4,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -48,7 +50,9 @@ one_replication_pti <- function(model_id,
 
   n_fit <- n_train + n_cal
 
-  data_fit  <- generate_data(model_id, n_fit, design = design)
+  data_fit  <- generate_data(
+    model_id, n_fit, design = design, heavy_tail_scale = heavy_tail_scale
+  )
   data_test <- generate_eval_data(model_id, n_test, design = design)
 
   x <- data_fit$x
@@ -67,7 +71,9 @@ one_replication_pti <- function(model_id,
   lower <- classical_fit$interval[, "lower"]
   upper <- classical_fit$interval[, "upper"]
 
-  content_vec <- content_function(model_id, lower, upper, x_test)
+  content_vec <- content_function(
+    model_id, lower, upper, x_test, heavy_tail_scale = heavy_tail_scale
+  )
   width_vec   <- upper - lower
 
   list(
@@ -96,13 +102,15 @@ one_replication_gy <- function(model_id,
                                content,
                                alpha,
                                seed = NULL,
-                               design = "uniform") {
+                               design = "uniform",
+                               heavy_tail_scale = c("original", "unit_variance")) {
   if (!is.null(seed)) {
     set.seed(seed)
   }
+  heavy_tail_scale <- match.arg(heavy_tail_scale)
 
   stopifnot(
-    model_id %in% 1:6,
+    model_id %in% 1:4,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -111,7 +119,9 @@ one_replication_gy <- function(model_id,
   )
 
   n_fit <- n_train + n_cal
-  data_fit <- generate_data(model_id, n_fit, design = design)
+  data_fit <- generate_data(
+    model_id, n_fit, design = design, heavy_tail_scale = heavy_tail_scale
+  )
   data_test <- generate_eval_data(model_id, n_test, design = design)
 
   x <- data_fit$x
@@ -132,7 +142,9 @@ one_replication_gy <- function(model_id,
 
   list(
     x = x_test,
-    content = content_function(model_id, lower, upper, x_test),
+    content = content_function(
+      model_id, lower, upper, x_test, heavy_tail_scale = heavy_tail_scale
+    ),
     width = upper - lower,
     lambda_na = rep(0L, n_test)
   )
@@ -151,17 +163,28 @@ one_replication_ours <- function(method,
                                  content,
                                  alpha,
                                  seed = NULL,
-                                 design = "uniform") {
+                                 design = "uniform",
+                                 cqr_basis_df = 8,
+                                 cqr_basis_type = "cv_fixed_ns",
+                                 cqr_df_grid = c(4, 6, 8, 10, 12),
+                                 cqr_cv_folds = 5,
+                                 heavy_tail_scale = c("original", "unit_variance"),
+                                 calibration_rule = c(
+                                   "hoeffding",
+                                   "exact_binomial"
+                                 )) {
 
   method <- match.arg(
     method,
     c("SR-TI", "ASR-TI", "CQR-TI", "NCQR-TI")
   )
+  calibration_rule <- match.arg(calibration_rule)
+  heavy_tail_scale <- match.arg(heavy_tail_scale)
 
   if (!is.null(seed)) set.seed(seed)
 
   stopifnot(
-    model_id %in% 1:6,
+    model_id %in% 1:4,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -175,8 +198,12 @@ one_replication_ours <- function(method,
   # Generate train / calibration / test data separately
   # --------------------------------------------------
 
-  data_train <- generate_data(model_id, n_train, design = design)
-  data_cal   <- generate_data(model_id, n_cal, design = design)
+  data_train <- generate_data(
+    model_id, n_train, design = design, heavy_tail_scale = heavy_tail_scale
+  )
+  data_cal <- generate_data(
+    model_id, n_cal, design = design, heavy_tail_scale = heavy_tail_scale
+  )
   data_test <- generate_eval_data(model_id, n_test, design = design)
 
   extract_xy <- function(data, model_id) {
@@ -222,7 +249,8 @@ one_replication_ours <- function(method,
       alpha    = alpha,
       y        = cal_y,
       pred     = mu_cal,
-      variance = var_cal
+      variance = var_cal,
+      calibration_rule = calibration_rule
     )
 
     if (is.na(lambda_hat)) {
@@ -243,7 +271,9 @@ one_replication_ours <- function(method,
     lower <- mu_test - lambda_hat * sqrt(pmax(var_test, 1e-8))
     upper <- mu_test + lambda_hat * sqrt(pmax(var_test, 1e-8))
 
-    content_vec <- content_function(model_id, lower, upper, test_x)
+    content_vec <- content_function(
+      model_id, lower, upper, test_x, heavy_tail_scale = heavy_tail_scale
+    )
     width_vec   <- upper - lower
 
     return(list(
@@ -296,7 +326,8 @@ one_replication_ours <- function(method,
     q_hat <- find_score_cutoff(
       mis = mis,
       alpha = alpha,
-      score = score_cal
+      score = score_cal,
+      calibration_rule = calibration_rule
     )
 
     if (is.na(q_hat)) {
@@ -318,7 +349,9 @@ one_replication_ours <- function(method,
     lower <- mu_test - q_hat * a_minus * sd_test
     upper <- mu_test + q_hat * a_plus  * sd_test
 
-    content_vec <- content_function(model_id, lower, upper, test_x)
+    content_vec <- content_function(
+      model_id, lower, upper, test_x, heavy_tail_scale = heavy_tail_scale
+    )
     width_vec   <- upper - lower
 
     return(list(
@@ -337,10 +370,21 @@ one_replication_ours <- function(method,
 
     tau_lo <- mis / 2
     tau_hi <- 1 - mis / 2
+    cqr_fold_id <- sample(
+      rep(seq_len(cqr_cv_folds), length.out = length(train_x))
+    )
 
     # fit quantile models on training data
-    fit_qlo <- fit_quantile_model_auto(train_x, train_y, tau_lo, model_id)
-    fit_qhi <- fit_quantile_model_auto(train_x, train_y, tau_hi, model_id)
+    fit_qlo <- fit_quantile_model_auto(
+      train_x, train_y, tau_lo, model_id, basis_df = cqr_basis_df,
+      design = design, basis_type = cqr_basis_type,
+      candidate_dfs = cqr_df_grid, fold_id = cqr_fold_id
+    )
+    fit_qhi <- fit_quantile_model_auto(
+      train_x, train_y, tau_hi, model_id, basis_df = cqr_basis_df,
+      design = design, basis_type = cqr_basis_type,
+      candidate_dfs = cqr_df_grid, fold_id = cqr_fold_id
+    )
 
     # calibration scores
     qlo_cal <- predict_quantile_auto(fit_qlo, cal_x, model_id)
@@ -354,7 +398,8 @@ one_replication_ours <- function(method,
     lambda_hat <- find_score_cutoff(
       mis = mis,
       alpha = alpha,
-      score = score_cal
+      score = score_cal,
+      calibration_rule = calibration_rule
     )
 
     if (is.na(lambda_hat)) {
@@ -375,7 +420,9 @@ one_replication_ours <- function(method,
     lower <- qlo_test - lambda_hat
     upper <- qhi_test + lambda_hat
 
-    content_vec <- content_function(model_id, lower, upper, test_x)
+    content_vec <- content_function(
+      model_id, lower, upper, test_x, heavy_tail_scale = heavy_tail_scale
+    )
     width_vec   <- upper - lower
 
     return(list(
@@ -404,10 +451,10 @@ one_replication_ours <- function(method,
     eps_scale <- 1e-6
 
     # fit quantile models on training data
-    fit_qlo_outer <- fit_quantile_model_auto(train_x, train_y, tau_lo_outer, model_id)
-    fit_qlo_inner <- fit_quantile_model_auto(train_x, train_y, tau_lo_inner, model_id)
-    fit_qhi_inner <- fit_quantile_model_auto(train_x, train_y, tau_hi_inner, model_id)
-    fit_qhi_outer <- fit_quantile_model_auto(train_x, train_y, tau_hi_outer, model_id)
+    fit_qlo_outer <- fit_quantile_model_auto(train_x, train_y, tau_lo_outer, model_id, basis_df = cqr_basis_df, design = design, basis_type = cqr_basis_type)
+    fit_qlo_inner <- fit_quantile_model_auto(train_x, train_y, tau_lo_inner, model_id, basis_df = cqr_basis_df, design = design, basis_type = cqr_basis_type)
+    fit_qhi_inner <- fit_quantile_model_auto(train_x, train_y, tau_hi_inner, model_id, basis_df = cqr_basis_df, design = design, basis_type = cqr_basis_type)
+    fit_qhi_outer <- fit_quantile_model_auto(train_x, train_y, tau_hi_outer, model_id, basis_df = cqr_basis_df, design = design, basis_type = cqr_basis_type)
 
     # calibration predictions
     qlo_outer_cal <- predict_quantile_auto(fit_qlo_outer, cal_x, model_id)
@@ -426,7 +473,8 @@ one_replication_ours <- function(method,
     q_hat <- find_score_cutoff(
       mis = mis,
       alpha = alpha,
-      score = score_cal
+      score = score_cal,
+      calibration_rule = calibration_rule
     )
 
     if (is.na(q_hat)) {
@@ -452,7 +500,9 @@ one_replication_ours <- function(method,
     lower <- qlo_inner_test - q_hat * s_minus_test
     upper <- qhi_inner_test + q_hat * s_plus_test
 
-    content_vec <- content_function(model_id, lower, upper, test_x)
+    content_vec <- content_function(
+      model_id, lower, upper, test_x, heavy_tail_scale = heavy_tail_scale
+    )
     width_vec   <- upper - lower
 
     return(list(

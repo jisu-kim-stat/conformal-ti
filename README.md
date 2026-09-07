@@ -8,7 +8,7 @@ The repository compares five methods:
 
 - **SR-TI**: symmetric standardized residual score
 - **ASR-TI**: asymmetric standardized residual score
-- **CQR-TI**: quantile-regression score
+- **CQR-TI**: conformalized lower- and upper-quantile regression score
 - **Parametric-TI**: classical homoscedastic normal-regression TI with
   mean model \(\beta_0+\beta_1\sin(2\pi x)\)
 - **GY-TI**: Guo and Young (2024) homoscedastic pointwise TI, using
@@ -56,22 +56,52 @@ ti_project/
 ```
 
 ## Simulation
-Simulation scripts are in:
-```text
-scripts/sim/
+
+The main simulation suite is the four-DGP design implemented in
+`scripts/sim/run_simulation_grid_balanced4.R`:
+
+1. homoscedastic Gaussian errors;
+2. unit-variance heavy-tailed \(t_3\) errors;
+3. heteroscedastic Gaussian location--scale errors; and
+4. smooth \(X\)-dependent endpoint asymmetry.
+
+All methods use \(n_{\rm tr}=n_{\rm cal}\in\{200,500,1000\}\), target
+content \(C=0.90\), and confidence level \(1-\alpha=0.95\).  The output
+files are written to `results/sim/balanced4/` and are distinguished by the
+user-supplied tag.
+
+### CQR base learner
+
+CQR fits the 0.05 and 0.95 conditional quantiles using natural-spline
+quantile regression on a fixed covariate support.  For each training split,
+the two spline complexities are selected separately by five-fold pinball-loss
+cross-validation over df \(\in\{4,6,8,10,12\}\).  The calibration split is
+used only to select the conformal score cutoff.
+
+Run the complete four-model study from the project root:
+
+```bash
+Rscript scripts/sim/run_simulation_grid_balanced4.R \
+  --reps=1000 \
+  --cores=4 \
+  --tag=full_cv
 ```
 
-Main scripts:
-```
-scripts/sim/run_simulation_grid_alt_dgp.R
-scripts/sim/make_plot_alt_dgp.R
+For a faster CQR-only validation on the homoscedastic Gaussian model:
+
+```bash
+Rscript scripts/sim/run_simulation_grid_balanced4.R \
+  --reps=200 \
+  --cores=4 \
+  --models=1 \
+  --methods=CQR-TI \
+  --tag=cqr_cv_pilot
 ```
 
-Run from the project root:
-```text
-Rscript scripts/sim/run_simulation_grid_alt_dgp.R
-Rscript scripts/sim/make_plot_alt_dgp.R
-```
+The runner also accepts `--ncal=200,500,1000`, `--designs=normal,uniform`,
+`--models=1,2,3,4`, and `--methods=` to restrict a run.  The legacy
+fixed-B-spline CQR implementation can be reproduced only by explicitly
+passing `--cqr_basis_type=legacy_bs`.
 
 Quick validation:
 

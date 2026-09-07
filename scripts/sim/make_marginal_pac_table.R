@@ -23,6 +23,15 @@ dir.create(
   showWarnings = FALSE
 )
 
+
+# ============================================================
+# Appendix table: remaining models
+# ============================================================
+
+models_to_include <- c(3,4)
+
+output_path <- "/Users/jisukim/ti_project/tables/table_marginal_pac_representative.tex"
+
 # ============================================================
 # Read and combine
 # ============================================================
@@ -53,23 +62,14 @@ method_order <- c(
 
 table_long <- dat %>%
   filter(
-    design %in% c("normal", "uniform"),
-    model %in% c(3, 4),
-    Method %in% method_order
+  design %in% c("normal", "uniform"),
+  model %in% models_to_include,
+  Method %in% method_order
   ) %>%
   mutate(
-    design = factor(
-      design,
-      levels = c("normal", "uniform")
-    ),
-    model = factor(
-      model,
-      levels = c(3, 4)
-    ),
-    Method = factor(
-      Method,
-      levels = method_order
-    ),
+    design = factor(design, levels = c("normal", "uniform")),
+    model = factor(model, levels = models_to_include),
+    Method = factor(Method, levels = method_order),
 
     # Marginal PAC success
     pac_value = sprintf("%.3f", marginal_pac_success),
@@ -113,14 +113,14 @@ table_wide <- table_long %>%
   ) %>%
   arrange(design, model, Method) %>%
   group_by(design, model) %>%
-    mutate(
-    Model = case_when(
-        row_number() == 1 & model == 3 ~ "Model 3",
-        row_number() == 1 & model == 4 ~ "Model 4",
-        TRUE ~ ""
+  mutate(
+    Model = if_else(
+      row_number() == 1,
+      paste("Model", as.character(model)),
+      ""
     )
-    ) %>%
-    ungroup() %>%
+  ) %>%
+  ungroup() %>%
   select(
     design,
     Model,
@@ -157,17 +157,13 @@ latex_table <- table_print %>%
       "$n_{\\mathrm{cal}}=1000$"
     ),
     caption = paste0(
-    "Monte Carlo estimates of marginal PAC success for the ",
-    "heteroscedastic Model~3 and globally skewed Model~4. ",
-    "Each entry reports the empirical marginal PAC success probability, ",
-    "with average interval width in parentheses. ",
-    "The upper and lower panels correspond to ",
-    "$X\\sim N(0,1)$ and ",
-    "$X\\sim\\operatorname{Unif}(-2,2)$, respectively. ",
-    "Bold success probabilities fall below the target ",
-    "$1-\\alpha=0.95$. Results are based on ",
-    "$M=1000$ Monte Carlo replications."
-    ),
+    "Empirical marginal PAC success for homoscedastic Gaussian Model~1, ",
+    "heavy-tailed symmetric Model~2, and \\(X\\)-dependent-skewness Model~5, ",
+    "with mean interval width in parentheses, under the normal and uniform ",
+    "covariate designs. Bold entries fall below the target ",
+    "\\(1-\\alpha=0.95\\). Results are based on \\(M=1000\\) Monte Carlo ",
+    "replications."
+  ),
     label = "marginal-pac-representative"
   ) %>%
   pack_rows(
