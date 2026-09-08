@@ -58,10 +58,42 @@ select_quantile_spline_df <- function(x, y, tau, design, candidate_dfs,
   candidate_dfs[which.min(cv_loss)]
 }
 
+fit_rqss_quantile <- function(x, y, tau, lambda) {
+  qss <- quantreg::qss
+  fit <- quantreg::rqss(
+    y ~ qss(x, lambda = lambda),
+    tau = tau,
+    data = data.frame(x = x, y = y)
+  )
+  attr(fit, "cqr_x_range") <- range(x)
+  fit
+}
+
+select_quantile_rqss_lambda <- function(x, y, tau, candidate_lambdas,
+                                        fold_id) {
+  stopifnot(length(x) == length(y), length(y) == length(fold_id))
+  candidate_lambdas <- sort(unique(as.numeric(candidate_lambdas)))
+  stopifnot(length(candidate_lambdas) >= 1L, all(is.finite(candidate_lambdas)),
+            all(candidate_lambdas > 0))
+
+  cv_loss <- vapply(candidate_lambdas, function(lambda) {
+    fold_loss <- vapply(sort(unique(fold_id)), function(fold) {
+      train_idx <- fold_id != fold
+      valid_idx <- !train_idx
+      fit <- fit_rqss_quantile(x[train_idx], y[train_idx], tau, lambda)
+      pinball_loss(y[valid_idx], predict_quantile(fit, x[valid_idx]), tau)
+    }, numeric(1))
+    mean(fold_loss)
+  }, numeric(1))
+
+  candidate_lambdas[which.min(cv_loss)]
+}
+
 fit_quantile_model <- function(x, y, tau, basis_df = 8,
                                design = c("uniform", "normal"),
-                               basis_type = c("cv_fixed_ns", "fixed_ns", "legacy_bs"),
+                               basis_type = c("cv_fixed_ns", "cv_rqss", "fixed_ns", "legacy_bs"),
                                candidate_dfs = c(4, 6, 8, 10, 12),
+                               candidate_lambdas = c(0.01, 0.03, 0.1, 0.3, 1, 3),
                                fold_id = NULL) {
   design <- match.arg(design)
   basis_type <- match.arg(basis_type)
@@ -69,6 +101,18 @@ fit_quantile_model <- function(x, y, tau, basis_df = 8,
     x = x,
     y = y
   )
+
+  if (basis_type == "cv_rqss") {
+    if (is.null(fold_id)) {
+      fold_id <- sample(rep(seq_len(5L), length.out = length(y)))
+    }
+    lambda <- select_quantile_rqss_lambda(
+      x, y, tau = tau, candidate_lambdas = candidate_lambdas, fold_id = fold_id
+    )
+    fit <- fit_rqss_quantile(x, y, tau = tau, lambda = lambda)
+    attr(fit, "cqr_selected_lambda") <- lambda
+    return(fit)
+  }
 
   if (basis_type %in% c("cv_fixed_ns", "fixed_ns")) {
     if (basis_type == "cv_fixed_ns") {
@@ -93,12 +137,45 @@ fit_quantile_model <- function(x, y, tau, basis_df = 8,
 }
 
 predict_quantile <- function(fit_quantile, xnew) {
+  if (inherits(fit_quantile, "rqss")) {
+    x_range <- attr(fit_quantile, "cqr_x_range")
+    x_inside <- pmin(pmax(xnew, x_range[1]), x_range[2])
+    fitted <- as.numeric(predict(fit_quantile, newdata = data.frame(x = x_inside)))
+
+    # rqss does not extrapolate.  Holding the endpoint prediction constant
+    # caused systematic undercoverage in the covariate tails, so extend the
+    # fitted endpoint linearly using a short, in-support secant slope.
+    span <- diff(x_range)
+    step <- max(1e-6, 0.01 * span)
+    left_base <- x_range[1]
+    right_base <- x_range[2]
+    left_next <- min(left_base + step, right_base)
+    right_prev <- max(right_base - step, left_base)
+    left_slope <- (
+      as.numeric(predict(fit_quantile, newdata = data.frame(x = left_next))) -
+        as.numeric(predict(fit_quantile, newdata = data.frame(x = left_base)))
+    ) / (left_next - left_base)
+    right_slope <- (
+      as.numeric(predict(fit_quantile, newdata = data.frame(x = right_base))) -
+        as.numeric(predict(fit_quantile, newdata = data.frame(x = right_prev)))
+    ) / (right_base - right_prev)
+
+    below <- xnew < left_base
+    above <- xnew > right_base
+    fitted[below] <- fitted[below] + left_slope * (xnew[below] - left_base)
+    fitted[above] <- fitted[above] + right_slope * (xnew[above] - right_base)
+    return(fitted)
+  }
   as.numeric(
     predict(
       fit_quantile,
       newdata = data.frame(x = xnew)
     )
   )
+}
+
+order_quantile_endpoints <- function(qlo, qhi) {
+  list(lower = pmin(qlo, qhi), upper = pmax(qlo, qhi))
 }
 
 fit_quantile_model_hd <- function(x, y, tau) {
@@ -133,6 +210,7 @@ fit_quantile_model_auto <- function(x, y, tau, model_id, basis_df = 8,
                                     design = "uniform",
                                     basis_type = "cv_fixed_ns",
                                     candidate_dfs = c(4, 6, 8, 10, 12),
+                                    candidate_lambdas = c(0.01, 0.03, 0.1, 0.3, 1, 3),
                                     fold_id = NULL) {
   fit_quantile_model(
     x, y, tau,
@@ -140,6 +218,7 @@ fit_quantile_model_auto <- function(x, y, tau, model_id, basis_df = 8,
     design = design,
     basis_type = basis_type,
     candidate_dfs = candidate_dfs,
+    candidate_lambdas = candidate_lambdas,
     fold_id = fold_id
   )
 }

@@ -1,10 +1,10 @@
-# Four-DGP simulation suite for the main paper.
-# Models 1--3 retain the original location--scale settings. Model 4 has
-# smoothly varying lower/upper tail scales and is not a location--scale model.
+# Five-DGP simulation suite for the main paper.
+# Models 1--4 have an x-invariant standardized residual distribution; Model 5
+# has x-dependent residual shape and is not a location--scale model.
 
 generate_data <- function(model_id, n, design = "uniform",
                           heavy_tail_scale = c("original", "unit_variance")) {
-  stopifnot(model_id %in% 1:4)
+  stopifnot(model_id %in% 1:5)
   design <- match.arg(design, c("uniform", "normal"))
   match.arg(heavy_tail_scale)
 
@@ -16,7 +16,7 @@ generate_data <- function(model_id, n, design = "uniform",
   }
 
   if (model_id == 2) {
-    y <- base + rt(n, df = 3) / sqrt(3)
+    y <- base + rt(n, df = 3)
   }
 
   if (model_id == 3) {
@@ -24,20 +24,25 @@ generate_data <- function(model_id, n, design = "uniform",
   }
 
   if (model_id == 4) {
-    p <- plogis(2 * x)
-    sigma_minus <- 0.7 + 0.5 * p
-    sigma_plus <- 1.3 - 0.5 * p
-    z <- rnorm(n)
-    eps_raw <- ifelse(z < 0, sigma_minus * z, sigma_plus * z)
-    mean_eps <- (sigma_plus - sigma_minus) / sqrt(2 * pi)
-    y <- base + eps_raw - mean_eps
+    y <- base + (rchisq(n, df = 2) - 2) / 2
+  }
+
+  if (model_id == 5) {
+    # Both mixture components have mean zero and variance one.  The changing
+    # mixture weight therefore changes conditional skewness, not location or
+    # scale alone.
+    w <- plogis(3 * x)
+    is_skewed <- runif(n) < w
+    eps <- rnorm(n)
+    eps[is_skewed] <- rexp(sum(is_skewed)) - 1
+    y <- base + eps
   }
 
   data.frame(x = x, y = y)
 }
 
 generate_eval_data <- function(model_id, n, design = "uniform") {
-  stopifnot(model_id %in% 1:4)
+  stopifnot(model_id %in% 1:5)
   design <- match.arg(design, c("uniform", "normal"))
   p <- (seq_len(n) - 0.5) / n
   x <- if (design == "uniform") qunif(p, -2, 2) else qnorm(p)
@@ -46,20 +51,19 @@ generate_eval_data <- function(model_id, n, design = "uniform") {
 
 generate_y_given_x <- function(model_id, x,
                                 heavy_tail_scale = c("original", "unit_variance")) {
-  stopifnot(model_id %in% 1:4)
+  stopifnot(model_id %in% 1:5)
   match.arg(heavy_tail_scale)
   base <- base_mean(x)
   n <- length(x)
 
   if (model_id == 1) return(base + rnorm(n))
-  if (model_id == 2) return(base + rt(n, df = 3) / sqrt(3))
+  if (model_id == 2) return(base + rt(n, df = 3))
   if (model_id == 3) return(base + (1 + abs(x)) * rnorm(n))
+  if (model_id == 4) return(base + (rchisq(n, df = 2) - 2) / 2)
 
-  p <- plogis(2 * x)
-  sigma_minus <- 0.7 + 0.5 * p
-  sigma_plus <- 1.3 - 0.5 * p
-  z <- rnorm(n)
-  eps_raw <- ifelse(z < 0, sigma_minus * z, sigma_plus * z)
-  mean_eps <- (sigma_plus - sigma_minus) / sqrt(2 * pi)
-  base + eps_raw - mean_eps
+  w <- plogis(3 * x)
+  is_skewed <- runif(n) < w
+  eps <- rnorm(n)
+  eps[is_skewed] <- rexp(sum(is_skewed)) - 1
+  base + eps
 }

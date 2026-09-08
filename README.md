@@ -9,8 +9,8 @@ The repository compares five methods:
 - **SR-TI**: symmetric standardized residual score
 - **ASR-TI**: asymmetric standardized residual score
 - **CQR-TI**: conformalized lower- and upper-quantile regression score
-- **Parametric-TI**: classical homoscedastic normal-regression TI with
-  mean model \(\beta_0+\beta_1\sin(2\pi x)\)
+- **Parametric-TI**: classical homoscedastic normal-regression TI with a
+  fixed 10-dimensional cubic B-spline mean basis
 - **GY-TI**: Guo and Young (2024) homoscedastic pointwise TI, using
   Equation (11) and the fast k-factor approximation in Appendix
   Lemma A.1(3)
@@ -41,13 +41,14 @@ ti_project/
 
 ## Simulation
 
-The main simulation suite is the four-DGP design implemented in
+The main simulation suite is the five-DGP design implemented in
 `scripts/sim/run_simulation_grid_balanced4.R`:
 
 1. homoscedastic Gaussian errors;
-2. unit-variance heavy-tailed \(t_3\) errors;
+2. heavy-tailed \(t_3\) errors;
 3. heteroscedastic Gaussian location--scale errors; and
-4. smooth \(X\)-dependent endpoint asymmetry.
+4. strongly skewed homoscedastic errors; and
+5. \(X\)-dependent skewness through a normal/exponential mixture.
 
 All methods use \(n_{\rm tr}=n_{\rm cal}\in\{200,500,1000\}\), target
 content \(C=0.90\), and confidence level \(1-\alpha=0.95\).  The output
@@ -56,13 +57,14 @@ user-supplied tag.
 
 ### CQR base learner
 
-CQR fits the 0.05 and 0.95 conditional quantiles using natural-spline
-quantile regression on a fixed covariate support.  For each training split,
-the two spline complexities are selected separately by five-fold pinball-loss
-cross-validation over df \(\in\{4,6,8,10,12\}\).  The calibration split is
-used only to select the conformal score cutoff.
+CQR fits the 0.05 and 0.95 conditional quantiles with natural-spline quantile
+regression on a fixed covariate support. For each training split, the two
+spline complexities are selected separately by pinball-loss cross-validation;
+the calibration split is used only to select the conformal score cutoff. An
+experimental penalized quantile smoothing spline remains available through
+`--cqr_basis_type=cv_rqss`.
 
-Run the complete four-model study from the project root:
+Run the complete five-model study from the project root:
 
 ```bash
 Rscript scripts/sim/run_simulation_grid_balanced4.R \
@@ -83,9 +85,9 @@ Rscript scripts/sim/run_simulation_grid_balanced4.R \
 ```
 
 The runner also accepts `--ncal=200,500,1000`, `--designs=normal,uniform`,
-`--models=1,2,3,4`, and `--methods=` to restrict a run.  The legacy
-fixed-B-spline CQR implementation can be reproduced only by explicitly
-passing `--cqr_basis_type=legacy_bs`.
+`--models=1,2,3,4,5`, and `--methods=` to restrict a run.  Pass
+`--methods=Oracle-CQR-TI` only for a simulation diagnostic that uses known
+conditional quantiles; it is not a competing method in the paper.
 
 Quick validation:
 

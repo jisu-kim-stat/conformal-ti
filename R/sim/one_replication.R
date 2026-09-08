@@ -15,8 +15,8 @@
 # --------------------------------------------------
 # Parametric-TI
 #
-# Classical homoscedastic normal-regression tolerance interval:
-#   E(Y | X=x) = beta_0 + beta_1 sin(2*pi*x),
+# Fixed-basis homoscedastic normal-regression tolerance interval:
+#   E(Y | X=x) = b(x)^T beta, where b is a pre-specified cubic B-spline basis,
 #   epsilon ~ N(0, sigma^2).
 #
 # It uses residual df n-p, regression leverage h(x), and the closed-form
@@ -40,7 +40,7 @@ one_replication_pti <- function(model_id,
   heavy_tail_scale <- match.arg(heavy_tail_scale)
 
   stopifnot(
-    model_id %in% 1:4,
+    model_id %in% 1:5,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -65,7 +65,9 @@ one_replication_pti <- function(model_id,
     y = y,
     x_new = x_test,
     content = content,
-    alpha = alpha
+    alpha = alpha,
+    basis_df = 10L,
+    boundary_knots = c(-4, 4)
   )
 
   lower <- classical_fit$interval[, "lower"]
@@ -110,7 +112,7 @@ one_replication_gy <- function(model_id,
   heavy_tail_scale <- match.arg(heavy_tail_scale)
 
   stopifnot(
-    model_id %in% 1:4,
+    model_id %in% 1:5,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -167,6 +169,7 @@ one_replication_ours <- function(method,
                                  cqr_basis_df = 8,
                                  cqr_basis_type = "cv_fixed_ns",
                                  cqr_df_grid = c(4, 6, 8, 10, 12),
+                                 cqr_lambda_grid = c(0.01, 0.03, 0.1, 0.3, 1, 3),
                                  cqr_cv_folds = 5,
                                  heavy_tail_scale = c("original", "unit_variance"),
                                  calibration_rule = c(
@@ -176,7 +179,7 @@ one_replication_ours <- function(method,
 
   method <- match.arg(
     method,
-    c("SR-TI", "ASR-TI", "CQR-TI", "NCQR-TI")
+    c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI", "NCQR-TI")
   )
   calibration_rule <- match.arg(calibration_rule)
   heavy_tail_scale <- match.arg(heavy_tail_scale)
@@ -184,7 +187,7 @@ one_replication_ours <- function(method,
   if (!is.null(seed)) set.seed(seed)
 
   stopifnot(
-    model_id %in% 1:4,
+    model_id %in% 1:5,
     n_train >= 2,
     n_cal >= 2,
     n_test >= 1,
@@ -366,7 +369,7 @@ one_replication_ours <- function(method,
   # CQR-TI
   # --------------------------------------------------
 
-  if (method == "CQR-TI") {
+  if (method %in% c("CQR-TI", "Oracle-CQR-TI")) {
 
     tau_lo <- mis / 2
     tau_hi <- 1 - mis / 2
@@ -374,21 +377,28 @@ one_replication_ours <- function(method,
       rep(seq_len(cqr_cv_folds), length.out = length(train_x))
     )
 
-    # fit quantile models on training data
-    fit_qlo <- fit_quantile_model_auto(
-      train_x, train_y, tau_lo, model_id, basis_df = cqr_basis_df,
-      design = design, basis_type = cqr_basis_type,
-      candidate_dfs = cqr_df_grid, fold_id = cqr_fold_id
-    )
-    fit_qhi <- fit_quantile_model_auto(
-      train_x, train_y, tau_hi, model_id, basis_df = cqr_basis_df,
-      design = design, basis_type = cqr_basis_type,
-      candidate_dfs = cqr_df_grid, fold_id = cqr_fold_id
-    )
-
-    # calibration scores
-    qlo_cal <- predict_quantile_auto(fit_qlo, cal_x, model_id)
-    qhi_cal <- predict_quantile_auto(fit_qhi, cal_x, model_id)
+    if (method == "Oracle-CQR-TI") {
+      qlo_cal <- true_conditional_quantile(model_id, cal_x, tau_lo)
+      qhi_cal <- true_conditional_quantile(model_id, cal_x, tau_hi)
+    } else {
+      fit_qlo <- fit_quantile_model_auto(
+        train_x, train_y, tau_lo, model_id, basis_df = cqr_basis_df,
+        design = design, basis_type = cqr_basis_type,
+        candidate_dfs = cqr_df_grid, candidate_lambdas = cqr_lambda_grid,
+        fold_id = cqr_fold_id
+      )
+      fit_qhi <- fit_quantile_model_auto(
+        train_x, train_y, tau_hi, model_id, basis_df = cqr_basis_df,
+        design = design, basis_type = cqr_basis_type,
+        candidate_dfs = cqr_df_grid, candidate_lambdas = cqr_lambda_grid,
+        fold_id = cqr_fold_id
+      )
+      qlo_cal <- predict_quantile_auto(fit_qlo, cal_x, model_id)
+      qhi_cal <- predict_quantile_auto(fit_qhi, cal_x, model_id)
+    }
+    ordered_cal <- order_quantile_endpoints(qlo_cal, qhi_cal)
+    qlo_cal <- ordered_cal$lower
+    qhi_cal <- ordered_cal$upper
 
     score_cal <- pmax(
       qlo_cal - cal_y,
@@ -414,8 +424,16 @@ one_replication_ours <- function(method,
     }
 
     # evaluate intervals on test points
-    qlo_test <- predict_quantile_auto(fit_qlo, test_x, model_id)
-    qhi_test <- predict_quantile_auto(fit_qhi, test_x, model_id)
+    if (method == "Oracle-CQR-TI") {
+      qlo_test <- true_conditional_quantile(model_id, test_x, tau_lo)
+      qhi_test <- true_conditional_quantile(model_id, test_x, tau_hi)
+    } else {
+      qlo_test <- predict_quantile_auto(fit_qlo, test_x, model_id)
+      qhi_test <- predict_quantile_auto(fit_qhi, test_x, model_id)
+    }
+    ordered_test <- order_quantile_endpoints(qlo_test, qhi_test)
+    qlo_test <- ordered_test$lower
+    qhi_test <- ordered_test$upper
 
     lower <- qlo_test - lambda_hat
     upper <- qhi_test + lambda_hat

@@ -11,8 +11,9 @@ run_one_setting <- function(model_id,
                             design = "uniform",
                             n_bins = 50,
                             cqr_basis_df = 8,
-                            cqr_basis_type = c("cv_fixed_ns", "fixed_ns", "legacy_bs"),
+                            cqr_basis_type = c("cv_fixed_ns", "cv_rqss", "fixed_ns", "legacy_bs"),
                             cqr_df_grid = c(4, 6, 8, 10, 12),
+                            cqr_lambda_grid = c(0.01, 0.03, 0.1, 0.3, 1, 3),
                             cqr_cv_folds = 5,
                             heavy_tail_scale = c("original", "unit_variance"),
                             methods = c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI"),
@@ -24,10 +25,10 @@ run_one_setting <- function(model_id,
   calibration_rule <- match.arg(calibration_rule)
   heavy_tail_scale <- match.arg(heavy_tail_scale)
   cqr_basis_type <- match.arg(cqr_basis_type)
-  stopifnot(model_id %in% 1:4)
+  stopifnot(model_id %in% 1:5)
   stopifnot(length(cqr_basis_df) == 1L, is.finite(cqr_basis_df), cqr_basis_df >= 4)
   stopifnot(all(cqr_df_grid >= 4L), cqr_cv_folds >= 2L)
-  allowed_methods <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
+  allowed_methods <- c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI", "Parametric-TI", "GY-TI")
   stopifnot(length(methods) >= 1L, all(methods %in% allowed_methods))
 
   content_level <- content
@@ -83,7 +84,7 @@ run_one_setting <- function(model_id,
     out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
     out$calibration_rule <- if (
-      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI")
     ) calibration_rule else "not_applicable"
 
     out
@@ -121,7 +122,7 @@ run_one_setting <- function(model_id,
     out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
     out$calibration_rule <- if (
-      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI")
     ) calibration_rule else "not_applicable"
 
     out
@@ -161,7 +162,7 @@ run_one_setting <- function(model_id,
     out$heavy_tail_scale <- heavy_tail_scale
     out$Method <- method
     out$calibration_rule <- if (
-      method %in% c("SR-TI", "ASR-TI", "CQR-TI")
+      method %in% c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI")
     ) calibration_rule else "not_applicable"
 
     out
@@ -176,14 +177,14 @@ run_one_setting <- function(model_id,
       .export = c(
         "model_id", "n_train", "n_cal", "n_test",
         "content_level", "alpha_conf", "design", "calibration_rule",
-        "cqr_basis_df", "cqr_basis_type", "cqr_df_grid", "cqr_cv_folds", "heavy_tail_scale",
+        "cqr_basis_df", "cqr_basis_type", "cqr_df_grid", "cqr_lambda_grid", "cqr_cv_folds", "heavy_tail_scale",
         "one_replication_ours", "one_replication_pti", "one_replication_gy",
         "base_mean", "generate_data", "content_function", "generate_eval_data",
         "fit_mean_model", "fit_var_model", "predict_mean", "predict_var",
         "fit_mean_model_auto", "fit_var_model_auto", "predict_mean_auto", "predict_var_auto",
         "fixed_cqr_knots", "pinball_loss", "fit_fixed_ns_quantile",
         "select_quantile_spline_df", "fit_quantile_model", "predict_quantile", 
-        "fit_quantile_model_auto", "predict_quantile_auto",
+        "fit_quantile_model_auto", "predict_quantile_auto", "order_quantile_endpoints",
         "pac_calibration_index", "find_lambda_hat", "find_score_cutoff",
         "classical_parametric_design", "classical_parametric_ti",
         "find_parametric_k_factor", "find_asym_shape", "asym_residual_score",
@@ -194,7 +195,7 @@ run_one_setting <- function(model_id,
 
       tryCatch({
 
-        if (method %in% c("SR-TI", "ASR-TI", "CQR-TI")) {
+        if (method %in% c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI")) {
 
           r <- one_replication_ours(
             method = method,
@@ -209,6 +210,7 @@ run_one_setting <- function(model_id,
             cqr_basis_df = cqr_basis_df,
             cqr_basis_type = cqr_basis_type,
             cqr_df_grid = cqr_df_grid,
+            cqr_lambda_grid = cqr_lambda_grid,
             cqr_cv_folds = cqr_cv_folds,
             heavy_tail_scale = heavy_tail_scale,
             calibration_rule = calibration_rule

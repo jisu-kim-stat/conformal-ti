@@ -1,4 +1,4 @@
-# Main four-DGP simulation suite.
+# Main five-DGP simulation suite.
 # Run from the project root:
 # Rscript scripts/sim/run_simulation_grid_balanced4.R --reps=1000 --cores=4
 
@@ -43,7 +43,7 @@ detected_cores <- suppressWarnings(detectCores())
 default_cores <- if (is.na(detected_cores)) 1L else max(1L, detected_cores - 1L)
 n_cores <- as.integer(if (is.null(args$cores)) default_cores else args$cores)
 n_cal_vec <- parse_num_vec(args$ncal, c(200, 500, 1000))
-models <- parse_num_vec(args$models, 1:4)
+models <- parse_num_vec(args$models, 1:5)
 design_vec <- if (is.null(args$designs)) c("normal", "uniform") else strsplit(args$designs, ",", fixed = TRUE)[[1]]
 methods <- if (is.null(args$methods)) {
   c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
@@ -53,15 +53,17 @@ methods <- if (is.null(args$methods)) {
 cqr_basis_df <- as.integer(if (is.null(args$cqr_basis_df)) 8 else args$cqr_basis_df)
 cqr_basis_type <- if (is.null(args$cqr_basis_type)) "cv_fixed_ns" else args$cqr_basis_type
 cqr_df_grid <- if (is.null(args$cqr_df_grid)) c(4, 6, 8, 10, 12) else parse_num_vec(args$cqr_df_grid, integer())
+cqr_lambda_grid <- if (is.null(args$cqr_lambda_grid)) c(0.01, 0.03, 0.1, 0.3, 1, 3) else as.numeric(strsplit(args$cqr_lambda_grid, ",", fixed = TRUE)[[1]])
 cqr_cv_folds <- as.integer(if (is.null(args$cqr_cv_folds)) 5 else args$cqr_cv_folds)
 tag <- if (is.null(args$tag)) paste0("M", M) else args$tag
 
 stopifnot(M >= 1L, n_cores >= 1L, all(n_cal_vec >= 2L), cqr_basis_df >= 4L)
-stopifnot(all(models %in% 1:4))
+stopifnot(all(models %in% 1:5))
 stopifnot(all(design_vec %in% c("normal", "uniform")))
-stopifnot(all(methods %in% c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")))
-stopifnot(cqr_basis_type %in% c("cv_fixed_ns", "fixed_ns", "legacy_bs"))
+stopifnot(all(methods %in% c("SR-TI", "ASR-TI", "CQR-TI", "Oracle-CQR-TI", "Parametric-TI", "GY-TI")))
+stopifnot(cqr_basis_type %in% c("cv_rqss", "cv_fixed_ns", "fixed_ns", "legacy_bs"))
 stopifnot(all(cqr_df_grid >= 4L), cqr_cv_folds >= 2L)
+stopifnot(all(is.finite(cqr_lambda_grid)), all(cqr_lambda_grid > 0))
 
 content_level <- 0.90
 alpha <- 0.05
@@ -115,6 +117,7 @@ for (design in design_vec) for (model_id in models) for (n_cal in n_cal_vec) {
     cqr_basis_df = cqr_basis_df,
     cqr_basis_type = cqr_basis_type,
     cqr_df_grid = cqr_df_grid,
+    cqr_lambda_grid = cqr_lambda_grid,
     cqr_cv_folds = cqr_cv_folds,
     methods = methods,
     calibration_rule = "hoeffding"
@@ -140,13 +143,15 @@ metadata <- tibble(
   model = models,
   description = c(
     "Homoscedastic Gaussian",
-    "Unit-variance heavy-tailed t3",
+    "Heavy-tailed t3",
     "Heteroscedastic Gaussian location-scale",
-    "Smooth x-dependent endpoint asymmetry (non-location-scale)"
+    "Strongly skewed homoscedastic",
+    "X-dependent skewness mixture (non-location-scale)"
   )[models],
   cqr_basis_df = cqr_basis_df,
   cqr_basis_type = cqr_basis_type,
   cqr_df_grid = paste(cqr_df_grid, collapse = ","),
+  cqr_lambda_grid = paste(cqr_lambda_grid, collapse = ","),
   cqr_cv_folds = cqr_cv_folds,
   methods = paste(methods, collapse = ","),
   M = M,
@@ -154,4 +159,4 @@ metadata <- tibble(
 )
 write_csv(metadata, file.path(out_dir, paste0("metadata_", tag, ".csv")))
 
-message("Saved balanced-four-DGP results to: ", out_dir)
+message("Saved five-DGP results to: ", out_dir)

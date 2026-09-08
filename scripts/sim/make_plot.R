@@ -1,4 +1,4 @@
-# Create paper-ready figures from the four-DGP simulation CSV files.
+# Create paper-ready figures from the five-DGP simulation CSV files.
 #
 # Example:
 # Rscript scripts/sim/make_plot.R --tag=full_cv --out_dir=fig/sim/balanced4_full_cv
@@ -39,9 +39,10 @@ method_shapes <- c("SR-TI" = 16, "ASR-TI" = 18, "CQR-TI" = 17,
                    "Parametric-TI" = 15, "GY-TI" = 3)
 model_labels <- c(
   "1" = "Model 1: Gaussian",
-  "2" = "Model 2: unit-variance t(3)",
+  "2" = "Model 2: t(3)",
   "3" = "Model 3: heteroscedastic Gaussian",
-  "4" = "Model 4: X-dependent asymmetry"
+  "4" = "Model 4: global skewness",
+  "5" = "Model 5: X-dependent skewness"
 )
 
 paper_theme <- function(base_size = 11) {

@@ -1,25 +1,33 @@
 # R/sim/pti_utils.R
 # ------------------------------------------------------------
-# Classical homoscedastic normal-regression TI used by Parametric-TI.
+# Finite-dimensional homoscedastic normal-regression TI used by Parametric-TI.
 #
 # This is deliberately separate from Guo and Young's Proposition 3.1 /
 # Equation (14), which is implemented in guo_young_ti.R by numerical
 # integration and root finding.
 # ------------------------------------------------------------
 
-classical_parametric_design <- function(x) {
+classical_parametric_design <- function(x,
+                                        basis_df = 10L,
+                                        boundary_knots = c(-4, 4)) {
   x <- as.numeric(x)
 
   if (any(!is.finite(x))) {
     stop("x must be finite.", call. = FALSE)
   }
 
-  # The simulation mean is base_mean(x) = sin(2*pi*x). Thus this is a
-  # correctly specified finite-dimensional normal regression model:
-  #   E(Y | X=x) = beta_0 + beta_1 sin(2*pi*x).
+  # Use a fixed finite-dimensional spline basis selected independently of the
+  # DGP.  In particular, do not supply the true sin(2*pi*x) mean feature to
+  # this benchmark.
   cbind(
     "(Intercept)" = 1,
-    "sin(2*pi*x)" = sin(2 * pi * x)
+    splines::bs(
+      x,
+      df = basis_df,
+      degree = 3L,
+      intercept = FALSE,
+      Boundary.knots = boundary_knots
+    )
   )
 }
 
@@ -54,7 +62,9 @@ classical_parametric_ti <- function(x,
                                     y,
                                     x_new = x,
                                     content = 0.90,
-                                    alpha = 0.05) {
+                                    alpha = 0.05,
+                                    basis_df = 10L,
+                                    boundary_knots = c(-4, 4)) {
   x <- as.numeric(x)
   y <- as.numeric(y)
   x_new <- as.numeric(x_new)
@@ -66,8 +76,12 @@ classical_parametric_ti <- function(x,
     stop("y must be finite.", call. = FALSE)
   }
 
-  design <- classical_parametric_design(x)
-  design_new <- classical_parametric_design(x_new)
+  design <- classical_parametric_design(
+    x, basis_df = basis_df, boundary_knots = boundary_knots
+  )
+  design_new <- classical_parametric_design(
+    x_new, basis_df = basis_df, boundary_knots = boundary_knots
+  )
   n <- nrow(design)
   p <- ncol(design)
   nu <- n - p

@@ -1,410 +1,171 @@
-# scripts/make_assumption_plots_paper.R
-# ------------------------------------------------------------
-# Paper-style assumption diagnostic plots
-# Uses existing CSV outputs from check_assumptions_alt_dgp.R
-# ------------------------------------------------------------
+#!/usr/bin/env Rscript
+
+# Paper plots for the balanced-four-DGP score-pivotality diagnostic.
+# Example:
+# Rscript scripts/make_assumption_plots_paper.R --tag=full_cv
 
 suppressPackageStartupMessages({
-  library(dplyr)
-  library(readr)
+  library(data.table)
   library(ggplot2)
-  library(tidyr)
-  library(stringr)
 })
 
-# ------------------------------------------------------------
-# Paths
-# ------------------------------------------------------------
-
-diag_dir <- "results/sim/models/assumption_diagnostics_alt_dgp"
-out_dir  <- file.path(diag_dir, "paper_plots")
-
+parse_args <- function(args) {
+  out <- list()
+  for (arg in args) if (startsWith(arg, "--")) {
+    bits <- strsplit(substring(arg, 3), "=", fixed = TRUE)[[1]]
+    out[[bits[1]]] <- if (length(bits) == 2L) bits[2] else TRUE
+  }
+  out
+}
+args <- parse_args(commandArgs(trailingOnly = TRUE))
+tag <- if (is.null(args$tag)) "full_cv" else args$tag
+input_dir <- if (is.null(args$input_dir)) "results/sim/balanced4" else args$input_dir
+out_dir <- if (is.null(args$out_dir)) file.path("fig/sim", paste0("balanced4_", tag), "diagnostics") else args$out_dir
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-estimation_path <- file.path(diag_dir, "assumption_estimation_summary.csv")
-ks_path         <- file.path(diag_dir, "score_pivotality_ks_summary.csv")
-good_path       <- file.path(diag_dir, "score_pivotality_good_summary.csv")
+ks_path <- file.path(input_dir, paste0("score_pivotality_ks_summary_", tag, ".csv"))
+good_path <- file.path(input_dir, paste0("score_pivotality_good_summary_", tag, ".csv"))
+estimation_path <- file.path(input_dir, paste0("assumption_estimation_summary_", tag, ".csv"))
+cqr_path <- file.path(input_dir, paste0("cqr_assumption_summary_", tag, ".csv"))
+oracle_path <- file.path(input_dir, paste0("oracle_residual_stability_summary_", tag, ".csv"))
+stopifnot(file.exists(ks_path), file.exists(good_path), file.exists(estimation_path),
+          file.exists(cqr_path), file.exists(oracle_path))
+ks <- fread(ks_path)
+good <- fread(good_path)
+estimation <- fread(estimation_path)
+cqr <- fread(cqr_path)
+oracle <- fread(oracle_path)
 
-cat("[input] estimation:", estimation_path, "\n")
-cat("[input] KS:", ks_path, "\n")
-cat("[input] pivotality-good:", good_path, "\n")
-cat("[output dir]", out_dir, "\n")
-
-# ------------------------------------------------------------
-# Read data
-# ------------------------------------------------------------
-
-estimation_summary <- readr::read_csv(estimation_path, show_col_types = FALSE)
-pivotality_summary <- readr::read_csv(ks_path, show_col_types = FALSE)
-pivotality_good_summary <- readr::read_csv(good_path, show_col_types = FALSE)
-
-# ------------------------------------------------------------
-# Labels and style
-# ------------------------------------------------------------
-
-method_levels <- c("SR-TI", "ASR-TI", "CQR-TI")
-
-method_cols <- c(
-  "SR-TI" = "#D55E00",
-  "ASR-TI" = "#CC79A7",
-  "CQR-TI" = "#0072B2"
+methods <- c("SR-TI", "ASR-TI", "CQR-TI")
+colors <- c("SR-TI" = "#D55E00", "ASR-TI" = "#CC79A7", "CQR-TI" = "#0072B2")
+shapes <- c("SR-TI" = 16, "ASR-TI" = 18, "CQR-TI" = 17)
+model_labels <- c(
+  "1" = "Model 1: Gaussian", "2" = "Model 2: unit-variance t(5)",
+  "3" = "Model 3: heteroscedastic Gaussian", "4" = "Model 4: X-dependent asymmetry"
 )
 
-method_shapes <- c(
-  "SR-TI" = 16,
-  "ASR-TI" = 18,
-  "CQR-TI" = 17
-)
-
-design_labels <- c(
-  "uniform" = "Uniform",
-  "normal" = "Normal"
-)
-
-theme_paper_diag <- function(base_size = 11) {
-  theme_classic(base_size = base_size) +
-    theme(
-      plot.title = element_text(face = "bold", size = base_size + 2, hjust = 0),
-      plot.subtitle = element_blank(),
-      axis.title = element_text(face = "bold"),
-      axis.text = element_text(color = "black"),
-      axis.line = element_line(color = "black", linewidth = 0.35),
-      axis.ticks = element_line(color = "black", linewidth = 0.3),
-      panel.grid.major.y = element_line(color = "grey88", linewidth = 0.3),
-      panel.grid.major.x = element_line(color = "grey92", linewidth = 0.25),
-      panel.grid.minor = element_blank(),
-      strip.background = element_rect(
-        fill = "grey94",
-        color = "grey65",
-        linewidth = 0.35
-      ),
-      strip.text = element_text(face = "bold", color = "black", size = base_size - 0.5),
-      legend.position = "bottom",
-      legend.title = element_blank(),
-      legend.key.width = unit(1.4, "lines"),
-      plot.margin = margin(8, 10, 8, 10)
-    )
+clean_common <- function(d) {
+  d[, model := factor(as.character(model), levels = names(model_labels), labels = unname(model_labels))]
+  d[, design := factor(design, levels = c("normal", "uniform"), labels = c("Normal design", "Uniform design"))]
+  d
 }
-
-clean_common <- function(df) {
-  df %>%
-    mutate(
-      model = as.integer(model),
-      n_train = as.integer(n_train)
-    ) %>%
-    filter(model <= 5) %>%
-    mutate(
-      design = as.character(design),
-      model_lab = factor(
-        paste0("Model ", model),
-        levels = paste0("Model ", sort(unique(model)))
-      ),
-      design_lab = factor(
-        recode(design, !!!design_labels),
-        levels = unname(design_labels)
-      )
-    )
+clean_score <- function(d) {
+  d <- clean_common(d)
+  d[, Method := factor(Method, levels = methods)]
+  d
 }
-
-estimation_summary <- clean_common(estimation_summary)
-
-pivotality_summary <- pivotality_summary %>%
-  clean_common() %>%
-  mutate(
-    Method = factor(Method, levels = method_levels)
-  )
-
-pivotality_good_summary <- pivotality_good_summary %>%
-  clean_common() %>%
-  mutate(
-    Method = factor(Method, levels = method_levels),
-    ks_eps_lab = paste0("KS \u2264 ", ks_eps)
-  )
-
-n_train_breaks <- sort(unique(estimation_summary$n_train))
-ks_ylim <- c(
-  0,
-  max(pivotality_summary$ks_q90, na.rm = TRUE) * 1.05
-)
-
-# ------------------------------------------------------------
-# Main Figure: Score pivotality KS q90
-# ------------------------------------------------------------
-
-p_ks_main <- ggplot(
-  pivotality_summary,
-  aes(
-    x = n_train,
-    y = ks_q90,
-    color = Method,
-    shape = Method,
-    group = Method
-  )
-) +
-  geom_line(linewidth = 0.85) +
-  geom_point(size = 2.5, alpha = 0.95) +
-  facet_grid(design_lab ~ model_lab, scales = "fixed") +
-  coord_cartesian(ylim = ks_ylim) +
-  scale_color_manual(values = method_cols, drop = FALSE) +
-  scale_shape_manual(values = method_shapes, drop = FALSE) +
-  scale_x_continuous(breaks = n_train_breaks) +
-  labs(
-    title = "Score pivotality diagnostic",
-    x = "Training sample size",
-    y = expression("90th percentile of " * Delta(x))
-  ) +
-  theme_paper_diag(base_size = 11)
-
-ggsave(
-  filename = file.path(out_dir, "fig_score_pivotality_KS_q90_paper.png"),
-  plot = p_ks_main,
-  width = 12.5,
-  height = 6.4,
-  dpi = 300
-)
-
-# Optional: one-row version by design, easier for paper if too wide
-for (des in sort(unique(pivotality_summary$design))) {
-
-  df_des <- pivotality_summary %>%
-    filter(design == des)
-
-  des_lab <- unique(df_des$design_lab)
-
-  p_ks_des <- ggplot(
-    df_des,
-    aes(
-      x = n_train,
-      y = ks_q90,
-      color = Method,
-      shape = Method,
-      group = Method
-    )
-  ) +
-    geom_line(linewidth = 0.85) +
-    geom_point(size = 2.5, alpha = 0.95) +
-    facet_wrap(~ model_lab, nrow = 1, scales = "fixed") +
-    coord_cartesian(ylim = ks_ylim) +
-    scale_color_manual(values = method_cols, drop = FALSE) +
-    scale_shape_manual(values = method_shapes, drop = FALSE) +
-    scale_x_continuous(breaks = n_train_breaks) +
-    labs(
-      title = paste0("Score pivotality diagnostic: ", des_lab, " design"),
-      x = "Training sample size",
-      y = expression("90th percentile of " * Delta(x))
-    ) +
-    theme_paper_diag(base_size = 11)
-
-  ggsave(
-    filename = file.path(out_dir, paste0("fig_score_pivotality_KS_q90_", des, "_paper.png")),
-    plot = p_ks_des,
-    width = 13,
-    height = 4.2,
-    dpi = 300
+ks <- clean_score(ks); good <- clean_score(good)
+estimation <- clean_common(estimation); cqr <- clean_common(cqr); oracle <- clean_common(oracle)
+paper_theme <- function(base_size = 10) {
+  theme_classic(base_size = base_size) + theme(
+    legend.position = "bottom", legend.title = element_blank(),
+    strip.background = element_rect(fill = "grey93", color = "grey55"),
+    strip.text = element_text(face = "bold"), axis.title = element_text(face = "bold")
   )
 }
-
-# ------------------------------------------------------------
-# Appendix Figure A1: Mean estimation error
-# ------------------------------------------------------------
-
-p_mean <- ggplot(
-  estimation_summary,
-  aes(x = n_train, y = mean_l2_error_mean, group = 1)
-) +
-  geom_line(linewidth = 0.85) +
-  geom_point(size = 2.5) +
-  facet_grid(design_lab ~ model_lab, scales = "free_y") +
-  scale_x_continuous(breaks = n_train_breaks) +
-  labs(
-    title = "Mean estimation error",
-    x = "Training sample size",
-    y = expression(E_X[(hat(mu)(X) - mu(X))^2])
-  ) +
-  theme_paper_diag(base_size = 11)
-
-ggsave(
-  filename = file.path(out_dir, "app_mean_estimation_error_paper.png"),
-  plot = p_mean,
-  width = 12.5,
-  height = 6.4,
-  dpi = 300
-)
-
-# ------------------------------------------------------------
-# Appendix Figure A2: Variance estimation error
-# ------------------------------------------------------------
-
-p_var <- ggplot(
-  estimation_summary,
-  aes(x = n_train, y = var_l1_error_mean, group = 1)
-) +
-  geom_line(linewidth = 0.85) +
-  geom_point(size = 2.5) +
-  facet_grid(design_lab ~ model_lab, scales = "free_y") +
-  scale_x_continuous(breaks = n_train_breaks) +
-  labs(
-    title = "Variance estimation error",
-    x = "Training sample size",
-    y = expression(E_X[abs(hat(sigma)^2(X) - sigma^2(X))])
-  ) +
-  theme_paper_diag(base_size = 11)
-
-ggsave(
-  filename = file.path(out_dir, "app_variance_estimation_error_paper.png"),
-  plot = p_var,
-  width = 12.5,
-  height = 6.4,
-  dpi = 300
-)
-
-# ------------------------------------------------------------
-# Appendix Figure A3: Asymmetric tail-scale error
-# ------------------------------------------------------------
-
-tail_long <- estimation_summary %>%
-  select(
-    model, model_lab, design, design_lab, n_train,
-    a_minus_abs_error_mean,
-    a_plus_abs_error_mean
-  ) %>%
-  pivot_longer(
-    cols = c(a_minus_abs_error_mean, a_plus_abs_error_mean),
-    names_to = "tail_scale",
-    values_to = "abs_error"
-  ) %>%
-  mutate(
-    tail_scale = recode(
-      tail_scale,
-      "a_minus_abs_error_mean" = "a_minus",
-      "a_plus_abs_error_mean" = "a_plus"
-    ),
-    tail_scale = factor(tail_scale, levels = c("a_minus", "a_plus"))
-  )
-
-tail_cols <- c(
-  "a_minus" = "#E69F00",
-  "a_plus" = "#009E73"
-)
-
-tail_labs <- c(
-  "a_minus" = "a-",
-  "a_plus" = "a+"
-)
-
-p_tail <- ggplot(
-  tail_long,
-  aes(
-    x = n_train,
-    y = abs_error,
-    color = tail_scale,
-    shape = tail_scale,
-    group = tail_scale
-  )
-) +
-  geom_line(linewidth = 0.85) +
-  geom_point(size = 2.5, alpha = 0.95) +
-  facet_grid(design_lab ~ model_lab, scales = "free_y") +
-  scale_color_manual(values = tail_cols, labels = tail_labs) +
-  scale_shape_manual(values = c("a_minus" = 16, "a_plus" = 17), labels = tail_labs) +
-  scale_x_continuous(breaks = n_train_breaks) +
-  labs(
-    title = "Asymmetric tail-scale estimation error",
-    x = "Training sample size",
-    y = "Absolute error"
-  ) +
-  theme_paper_diag(base_size = 11)
-
-ggsave(
-  filename = file.path(out_dir, "app_tail_scale_error_paper.png"),
-  plot = p_tail,
-  width = 12.5,
-  height = 6.4,
-  dpi = 300
-)
-# ------------------------------------------------------------
-# Appendix Figure A4: Pivotality-good proportion
-# ------------------------------------------------------------
-
-p_good <- ggplot(
-  pivotality_good_summary,
-  aes(
-    x = n_train,
-    y = px_good_pivotality,
-    color = Method,
-    shape = Method,
-    group = Method
-  )
-) +
-  geom_line(linewidth = 0.8) +
-  geom_point(size = 2.3, alpha = 0.95) +
-  facet_grid(ks_eps_lab ~ model_lab + design_lab) +
-  scale_color_manual(values = method_cols, drop = FALSE) +
-  scale_shape_manual(values = method_shapes, drop = FALSE) +
-  scale_x_continuous(breaks = n_train_breaks) +
-  coord_cartesian(ylim = c(0, 1.03)) +
-  labs(
-    title = "Pivotality-good proportion",
-    x = "Training sample size",
-    y = "Proportion"
-  ) +
-  theme_paper_diag(base_size = 8.8) +
-  theme(
-    strip.text.x = element_text(size = 7.4),
-    strip.text.y = element_text(size = 8.2)
-  )
-
-ggsave(
-  filename = file.path(out_dir, "app_pivotality_good_proportion_paper.png"),
-  plot = p_good,
-  width = 15,
-  height = 8.5,
-  dpi = 300
-)
-
-# Optional: pivotality-good proportion by design
-for (des in sort(unique(pivotality_good_summary$design))) {
-
-  df_des <- pivotality_good_summary %>%
-    filter(design == des)
-
-  des_lab <- unique(df_des$design_lab)
-
-  p_good_des <- ggplot(
-    df_des,
-    aes(
-      x = n_train,
-      y = px_good_pivotality,
-      color = Method,
-      shape = Method,
-      group = Method
-    )
-  ) +
-    geom_line(linewidth = 0.8) +
-    geom_point(size = 2.3, alpha = 0.95) +
-    facet_grid(ks_eps_lab ~ model_lab) +
-    scale_color_manual(values = method_cols, drop = FALSE) +
-    scale_shape_manual(values = method_shapes, drop = FALSE) +
-    scale_x_continuous(breaks = n_train_breaks) +
-    coord_cartesian(ylim = c(0, 1.03)) +
-    labs(
-      title = paste0("Pivotality-good proportion: ", des_lab, " design"),
-      x = "Training sample size",
-      y = "Proportion"
-    ) +
-    theme_paper_diag(base_size = 9.5) +
-    theme(
-      strip.text.x = element_text(size = 8.2),
-      strip.text.y = element_text(size = 8.8)
-    )
-
-  ggsave(
-    filename = file.path(out_dir, paste0("app_pivotality_good_proportion_", des, "_paper.png")),
-    plot = p_good_des,
-    width = 13,
-    height = 7.2,
-    dpi = 300
-  )
+save_plot <- function(plot, stem, width, height) {
+  ggsave(file.path(out_dir, paste0(stem, ".png")), plot, width = width, height = height, dpi = 300)
+  ggsave(file.path(out_dir, paste0(stem, ".pdf")), plot, width = width, height = height)
 }
 
-cat("[done] paper-style diagnostic plots saved under:", out_dir, "\n")
+make_ks_plot <- function(design_name, stem) {
+  d <- ks[design == design_name]
+  if (!nrow(d)) return(invisible(NULL))
+  p <- ggplot(d, aes(n_train, ks_q90, color = Method, shape = Method, group = Method)) +
+    geom_line(linewidth = .75) + geom_point(size = 2.2) +
+    facet_wrap(~ model, nrow = 1) +
+    scale_color_manual(values = colors, drop = FALSE) + scale_shape_manual(values = shapes, drop = FALSE) +
+    scale_x_continuous(breaks = sort(unique(ks$n_train))) +
+    labs(x = expression(n[tr]), y = expression("90th percentile of " * Delta(x))) + paper_theme()
+  save_plot(p, stem, 13, 3.6)
+}
+
+# Main-text normal-design diagnostic and its uniform-design appendix counterpart.
+make_ks_plot("Normal design", "fig_score_pivotality_ks_q90_normal")
+make_ks_plot("Uniform design", "app_score_pivotality_ks_q90_uniform")
+
+# Appendix: sensitivity to the KS tolerance.
+p_good <- ggplot(good,
+                 aes(n_train, px_good_pivotality, color = Method, shape = Method, group = Method)) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey35") +
+  geom_line(linewidth = .65) + geom_point(size = 1.9) +
+  facet_grid(ks_eps + design ~ model) +
+  scale_color_manual(values = colors, drop = FALSE) + scale_shape_manual(values = shapes, drop = FALSE) +
+  scale_x_continuous(breaks = sort(unique(good$n_train))) + coord_cartesian(ylim = c(0, 1.03)) +
+  labs(x = expression(n[tr]), y = "Pivotality-good proportion") + paper_theme(8.5)
+save_plot(p_good, "app_pivotality_good", 14, 8)
+
+# Appendix: Assumptions 6.1(A3)--(A4) and 6.2(A4') for the
+# location--scale models only (Models 1--3).
+est_long <- melt(
+  estimation,
+  id.vars = c("model", "design", "n_train"),
+  measure.vars = c("mean_l2_error_mean", "var_l1_error_mean", "var_sup_error_mean"),
+  variable.name = "diagnostic", value.name = "error"
+)
+est_long[, diagnostic := factor(diagnostic,
+  levels = c("mean_l2_error_mean", "var_l1_error_mean", "var_sup_error_mean"),
+  labels = c("Mean L2 error (A3)", "Scale L1 error (A4)", "Scale sup error (A4')"))]
+p_residual <- ggplot(est_long, aes(n_train, error, group = diagnostic, color = diagnostic, shape = diagnostic)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) +
+  facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(estimation$n_train))) +
+  labs(x = expression(n[tr]), y = "Estimation error", color = NULL, shape = NULL) + paper_theme(9)
+save_plot(p_residual, "app_residual_nuisance_errors", 12.5, 6)
+
+# Appendix: Assumption 6.3(A7), only where a common residual distribution exists.
+tail_long <- melt(estimation,
+  id.vars = c("model", "design", "n_train"),
+  measure.vars = c("a_minus_abs_error_mean", "a_plus_abs_error_mean"),
+  variable.name = "tail", value.name = "absolute_error")
+tail_long[, tail := factor(tail, levels = c("a_minus_abs_error_mean", "a_plus_abs_error_mean"),
+                           labels = c("a-", "a+"))]
+p_tail <- ggplot(tail_long, aes(n_train, absolute_error, color = tail, shape = tail, group = tail)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(estimation$n_train))) +
+  labs(x = expression(n[tr]), y = "Absolute tail-scale error", color = NULL, shape = NULL) + paper_theme(9)
+save_plot(p_tail, "app_asr_tail_scale_error", 12.5, 6)
+
+# Appendix: Assumption 6.4(C1)--(C2), applicable to CQR in all four models.
+cqr_long <- melt(cqr,
+  id.vars = c("model", "design", "n_train"),
+  measure.vars = c("qlo_l1_error_mean", "qhi_l1_error_mean"),
+  variable.name = "endpoint", value.name = "l1_error")
+cqr_long[, endpoint := factor(endpoint, levels = c("qlo_l1_error_mean", "qhi_l1_error_mean"),
+                               labels = c("Lower endpoint", "Upper endpoint"))]
+p_cqr_endpoint <- ggplot(cqr_long, aes(n_train, l1_error, color = endpoint, shape = endpoint, group = endpoint)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(cqr$n_train))) +
+  labs(x = expression(n[tr]), y = "Mean absolute endpoint error", color = NULL, shape = NULL) + paper_theme(9)
+save_plot(p_cqr_endpoint, "app_cqr_endpoint_error", 14, 6)
+
+p_cqr_cutoff <- ggplot(cqr, aes(n_train, cqr_cutoff_abs_q90, group = 1)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(cqr$n_train))) +
+  labs(x = expression(n[tr]), y = expression("90th percentile of " * abs(hat(q)[CQR]))) + paper_theme(9)
+save_plot(p_cqr_cutoff, "app_cqr_cutoff_localization", 14, 6)
+
+# A direct finite-sample counterpart of the C2 score-CDF condition.  This is
+# reported next to cutoff localization; neither panel is presented as a proof
+# of the asymptotic bracketing assumption.
+p_cqr_cdf <- ggplot(cqr, aes(n_train, cqr_score_cdf_gap_at_zero_abs_q90, group = 1)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(cqr$n_train))) +
+  labs(x = expression(n[tr]),
+       y = expression("90th percentile of " * abs(hat(F)[CQR](0) - C))) + paper_theme(9)
+save_plot(p_cqr_cdf, "app_cqr_score_cdf_at_zero", 14, 6)
+
+p_cqr_c2 <- ggplot(cqr, aes(n_train, c2_bracket_success, group = 1)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model) +
+  scale_x_continuous(breaks = sort(unique(cqr$n_train))) + coord_cartesian(ylim = c(0, 1.03)) +
+  labs(x = expression(n[tr]), y = "C2 bracket-proxy success probability") + paper_theme(9)
+save_plot(p_cqr_c2, "app_cqr_c2_bracket_proxy", 14, 6)
+
+# Appendix: direct oracle check for A1; Model 4 is intentionally non-pivotal.
+p_oracle <- ggplot(oracle, aes(n_train, oracle_residual_ks_q90, group = 1)) +
+  geom_line(linewidth = .7) + geom_point(size = 2) + facet_grid(design ~ model, scales = "free_y") +
+  scale_x_continuous(breaks = sort(unique(oracle$n_train))) +
+  labs(x = expression(n[tr]), y = "Oracle standardized-residual KS q90") + paper_theme(9)
+save_plot(p_oracle, "app_oracle_residual_stability", 14, 6)
+
+message("Saved pivotality figures to: ", out_dir)

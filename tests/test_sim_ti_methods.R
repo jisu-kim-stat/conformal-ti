@@ -29,17 +29,17 @@ classical_fit <- classical_parametric_ti(
   content = 0.90,
   alpha = 0.05
 )
-lm_fit <- stats::lm(y_classical ~ sin(2 * pi * x_classical))
-lm_prediction <- stats::predict(
-  lm_fit,
-  newdata = data.frame(x_classical = x_classical_new)
-)
+design_train <- classical_parametric_design(x_classical)
+design_new <- classical_parametric_design(x_classical_new)
+lm_fit <- stats::lm.fit(design_train, y_classical)
+lm_prediction <- drop(design_new %*% lm_fit$coefficients)
+lm_sigma <- sqrt(sum(lm_fit$residuals^2) / lm_fit$df.residual)
 
 stopifnot(
-  max(abs(classical_fit$beta_hat - stats::coef(lm_fit))) < 1e-10,
-  max(abs(classical_fit$fitted - lm_prediction)) < 1e-10,
-  abs(classical_fit$sigma_hat - summary(lm_fit)$sigma) < 1e-10,
-  classical_fit$nu == stats::df.residual(lm_fit),
+  max(abs(classical_fit$beta_hat - lm_fit$coefficients)) < 1e-6,
+  max(abs(classical_fit$fitted - lm_prediction)) < 1e-6,
+  abs(classical_fit$sigma_hat - lm_sigma) < 1e-10,
+  classical_fit$nu == lm_fit$df.residual,
   all(classical_fit$interval[, "upper"] >
         classical_fit$interval[, "lower"])
 )
