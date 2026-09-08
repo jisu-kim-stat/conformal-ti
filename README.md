@@ -4,13 +4,12 @@ This repository contains simulation and real-data code for regression tolerance 
 
 ## Methods
 
-The repository compares five methods:
+The paper simulations compare four methods:
 
 - **SR-TI**: symmetric standardized residual score
-- **ASR-TI**: asymmetric standardized residual score
 - **CQR-TI**: conformalized lower- and upper-quantile regression score
 - **Parametric-TI**: classical homoscedastic normal-regression TI with a
-  fixed 10-dimensional cubic B-spline mean basis
+  fixed cubic B-spline mean basis of 10 spline functions and an intercept
 - **GY-TI**: Guo and Young (2024) homoscedastic pointwise TI, using
   Equation (11) and the fast k-factor approximation in Appendix
   Lemma A.1(3)
@@ -18,7 +17,7 @@ The repository compares five methods:
 The PAC-calibrated methods use the empirical \((C+\lambda_\alpha)\)-quantile of calibration scores, where
 
 ```text
-lambda_alpha = sqrt(log(2 / alpha) / (2 * n_cal))
+lambda_alpha = sqrt(log(1 / alpha) / (2 * n_cal))
 ```
 
 Default Settings : 
@@ -45,15 +44,18 @@ The main simulation suite is the five-DGP design implemented in
 `scripts/sim/run_simulation_grid_balanced4.R`:
 
 1. homoscedastic Gaussian errors;
-2. heavy-tailed \(t_3\) errors;
-3. heteroscedastic Gaussian location--scale errors; and
-4. strongly skewed homoscedastic errors; and
-5. \(X\)-dependent skewness through a normal/exponential mixture.
+2. heteroscedastic heavy-tailed \(t_3\) location--scale errors;
+3. heteroscedastic Gaussian location--scale errors;
+4. heteroscedastic globally skewed location--scale errors generated from a
+   centered, standardized \(\operatorname{Gamma}(4,1)\) innovation; and
+5. heteroscedastic two-piece Gaussian errors with \(X\)-dependent tail
+   asymmetry (a non-location--scale departure).
 
 All methods use \(n_{\rm tr}=n_{\rm cal}\in\{200,500,1000\}\), target
 content \(C=0.90\), and confidence level \(1-\alpha=0.95\).  The output
 files are written to `results/sim/balanced4/` and are distinguished by the
-user-supplied tag.
+user-supplied tag.  Models 2--5 use the common smooth scale
+\(\sigma(x)=\sqrt{1+x^2}\).
 
 ### CQR base learner
 
@@ -70,7 +72,14 @@ Run the complete five-model study from the project root:
 Rscript scripts/sim/run_simulation_grid_balanced4.R \
   --reps=1000 \
   --cores=4 \
-  --tag=full_cv
+  --models=1,2,3,4,5 \
+  --ncal=200,500,1000 \
+  --designs=normal,uniform \
+  --methods=SR-TI,CQR-TI,Parametric-TI,GY-TI \
+  --cqr_basis_type=cv_fixed_ns \
+  --tag=sr_cqr_full
+
+Rscript scripts/sim/make_plot.R --tag=sr_cqr_full
 ```
 
 For a faster CQR-only validation on the homoscedastic Gaussian model:
@@ -97,6 +106,7 @@ Rscript tests/test_sim_ti_methods.R
 
 ## Notes
 - PAC-calibrated methods use split data.
+- SR--TI and CQR--TI are the proposed PAC-calibrated procedures in the paper.
 - Parametric-TI and GY-TI are distinct model-based benchmarks.
 - GY-TI assumes homoscedastic errors and is not PAC calibrated.
 - Real-data results report empirical content, not true conditional coverage.

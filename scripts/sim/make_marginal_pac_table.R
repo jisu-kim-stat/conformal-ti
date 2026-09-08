@@ -54,7 +54,6 @@ target <- 0.95
 
 method_order <- c(
   "SR-TI",
-  "ASR-TI",
   "CQR-TI",
   "Parametric-TI",
   "GY-TI"
@@ -158,7 +157,7 @@ latex_table <- table_print %>%
     ),
     caption = paste0(
     "Empirical marginal PAC success for homoscedastic Gaussian Model~1, ",
-    "heavy-tailed symmetric Model~2, and \\(X\\)-dependent-skewness Model~5, ",
+    "heteroscedastic heavy-tailed Model~2, and heteroscedastic \\(X\\)-dependent-skewness Model~5, ",
     "with mean interval width in parentheses, under the normal and uniform ",
     "covariate designs. Bold entries fall below the target ",
     "\\(1-\\alpha=0.95\\). Results are based on \\(M=1000\\) Monte Carlo ",

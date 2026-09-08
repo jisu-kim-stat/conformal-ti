@@ -30,19 +30,19 @@ marginal_path <- file.path(input_dir, paste0("marginal_", tag, ".csv"))
 px_good_path <- file.path(input_dir, paste0("px_good_", tag, ".csv"))
 stopifnot(file.exists(pointwise_path), file.exists(marginal_path), file.exists(px_good_path))
 
-method_levels <- c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
+method_levels <- c("SR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
 method_cols <- c(
-  "SR-TI" = "#D55E00", "ASR-TI" = "#CC79A7", "CQR-TI" = "#0072B2",
+  "SR-TI" = "#D55E00", "CQR-TI" = "#0072B2",
   "Parametric-TI" = "#555555", "GY-TI" = "#009E73"
 )
-method_shapes <- c("SR-TI" = 16, "ASR-TI" = 18, "CQR-TI" = 17,
+method_shapes <- c("SR-TI" = 16, "CQR-TI" = 17,
                    "Parametric-TI" = 15, "GY-TI" = 3)
 model_labels <- c(
   "1" = "Model 1: Gaussian",
-  "2" = "Model 2: t(3)",
-  "3" = "Model 3: heteroscedastic Gaussian",
-  "4" = "Model 4: global skewness",
-  "5" = "Model 5: X-dependent skewness"
+  "2" = "Model 2: hetero-t(3)",
+  "3" = "Model 3: hetero-Gaussian",
+  "4" = "Model 4: hetero-global skewness",
+  "5" = "Model 5: two-piece X-dependent asymmetry"
 )
 
 paper_theme <- function(base_size = 11) {
@@ -102,6 +102,8 @@ for (des in levels(px_good$design)) {
     scale_color_manual(values = method_cols, drop = FALSE) +
     scale_shape_manual(values = method_shapes, drop = FALSE) +
     scale_x_continuous(breaks = sort(unique(px_des$n_cal))) +
+    # All substantive comparisons in the slack diagnostic occur near one;
+    # zooming avoids visually flattening the upper-range differences.
     coord_cartesian(ylim = c(0, 1.03)) +
     labs(x = expression(n[cal]), y = expression(hat(p)[X]^good(epsilon))) +
     paper_theme(8.5)
@@ -140,6 +142,28 @@ for (des in levels(px_good$design)) {
     coord_cartesian(ylim = c(0, 1.03)) +
     labs(x = "Covariate x", y = "Conditional-success probability") + paper_theme(8.5)
   save_plot(p_pointwise, paste0("app_pointwise_success_eps002_", gsub(" ", "_", tolower(des))), 14, 9)
+
+  # Appendix: local interval-width profiles at the largest calibration size.
+  # This complements the covariate-averaged width plot by showing where a
+  # method is narrow or wide across the covariate space.
+  n_width <- max(pw_des$n_cal)
+  p_pointwise_width <- ggplot(filter(pw_des, n_cal == n_width),
+                              aes(x, mean_width, color = Method, group = Method)) +
+    geom_line(linewidth = 0.6) +
+    facet_wrap(~ model, nrow = 1, scales = "free_y") +
+    scale_color_manual(values = method_cols, drop = FALSE) +
+    labs(
+      x = "Covariate x",
+      y = "Pointwise mean interval width",
+      caption = paste0("n_cal = ", n_width)
+    ) +
+    paper_theme(10) +
+    theme(plot.caption = element_text(hjust = 0.5))
+  save_plot(
+    p_pointwise_width,
+    paste0("app_pointwise_width_ncal", n_width, "_", gsub(" ", "_", tolower(des))),
+    13, 3.8
+  )
 }
 
 message("Saved figures to: ", out_dir)

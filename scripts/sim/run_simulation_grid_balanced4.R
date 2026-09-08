@@ -46,7 +46,7 @@ n_cal_vec <- parse_num_vec(args$ncal, c(200, 500, 1000))
 models <- parse_num_vec(args$models, 1:5)
 design_vec <- if (is.null(args$designs)) c("normal", "uniform") else strsplit(args$designs, ",", fixed = TRUE)[[1]]
 methods <- if (is.null(args$methods)) {
-  c("SR-TI", "ASR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
+  c("SR-TI", "CQR-TI", "Parametric-TI", "GY-TI")
 } else {
   strsplit(args$methods, ",", fixed = TRUE)[[1]]
 }
@@ -143,10 +143,10 @@ metadata <- tibble(
   model = models,
   description = c(
     "Homoscedastic Gaussian",
-    "Heavy-tailed t3",
+    "Heteroscedastic heavy-tailed t3 location-scale",
     "Heteroscedastic Gaussian location-scale",
-    "Strongly skewed homoscedastic",
-    "X-dependent skewness mixture (non-location-scale)"
+    "Heteroscedastic globally skewed location-scale",
+    "Heteroscedastic two-piece Gaussian with X-dependent asymmetry (non-location-scale)"
   )[models],
   cqr_basis_df = cqr_basis_df,
   cqr_basis_type = cqr_basis_type,

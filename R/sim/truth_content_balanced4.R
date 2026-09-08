@@ -9,26 +9,35 @@ content_function <- function(model_id, lower, upper, x,
   if (model_id == 1) return(pnorm(upper - base) - pnorm(lower - base))
 
   if (model_id == 2) {
+    sigma <- hetero_scale(x)
     return(
-      pt(upper - base, df = 3) - pt(lower - base, df = 3)
+      pt((upper - base) / sigma, df = 3) -
+        pt((lower - base) / sigma, df = 3)
     )
   }
 
   if (model_id == 3) {
-    sigma <- 1 + abs(x)
+    sigma <- hetero_scale(x)
     return(pnorm(upper - base, sd = sigma) - pnorm(lower - base, sd = sigma))
   }
 
   if (model_id == 4) {
-    residual_cdf <- function(z) pchisq(pmax(2 * z + 2, 0), df = 2)
-    return(residual_cdf(upper - base) - residual_cdf(lower - base))
+    sigma <- hetero_scale(x)
+    residual_cdf <- function(z) pgamma(pmax(2 * z + 4, 0), shape = 4, rate = 1)
+    return(
+      residual_cdf((upper - base) / sigma) -
+        residual_cdf((lower - base) / sigma)
+    )
   }
 
-  # Model 5 mixes N(0,1) and Exp(1)-1.  Its component CDFs are both known.
-  w <- plogis(3 * x)
+  # Model 5 is a recentered two-piece Gaussian with x-dependent upper-tail
+  # scale. Its distribution is continuous at the recentered split point.
+  s_minus <- hetero_scale(x)
+  s_plus <- s_minus * (1 + 0.8 * plogis(1.5 * x))
+  center <- (s_plus - s_minus) / sqrt(2 * pi)
   residual_cdf <- function(z) {
-    exp_component <- ifelse(z < -1, 0, pexp(z + 1))
-    (1 - w) * pnorm(z) + w * exp_component
+    raw <- z + center
+    ifelse(raw < 0, pnorm(raw / s_minus), pnorm(raw / s_plus))
   }
   residual_cdf(upper - base) - residual_cdf(lower - base)
 }
@@ -38,17 +47,19 @@ true_conditional_quantile <- function(model_id, x, probability) {
   base <- base_mean(x)
 
   if (model_id == 1) return(base + qnorm(probability))
-  if (model_id == 2) return(base + qt(probability, df = 3))
-  if (model_id == 3) return(base + (1 + abs(x)) * qnorm(probability))
-  if (model_id == 4) return(base + (qchisq(probability, df = 2) - 2) / 2)
-
-  w <- plogis(3 * x)
-  residual_cdf <- function(z, weight) {
-    exp_component <- ifelse(z < -1, 0, pexp(z + 1))
-    (1 - weight) * pnorm(z) + weight * exp_component
+  if (model_id == 2) return(base + hetero_scale(x) * qt(probability, df = 3))
+  if (model_id == 3) return(base + hetero_scale(x) * qnorm(probability))
+  if (model_id == 4) {
+    return(base + hetero_scale(x) * (qgamma(probability, shape = 4, rate = 1) - 4) / 2)
   }
-  base + vapply(w, function(weight) {
-    uniroot(function(z) residual_cdf(z, weight) - probability,
-            interval = c(-12, 20), tol = 1e-10)$root
-  }, numeric(1))
+
+  s_minus <- hetero_scale(x)
+  s_plus <- s_minus * (1 + 0.8 * plogis(1.5 * x))
+  center <- (s_plus - s_minus) / sqrt(2 * pi)
+  raw_quantile <- if (probability < 0.5) {
+    s_minus * qnorm(probability)
+  } else {
+    s_plus * qnorm(probability)
+  }
+  base + raw_quantile - center
 }
